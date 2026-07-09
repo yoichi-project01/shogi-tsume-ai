@@ -1,3 +1,13 @@
+"use client";
+
+import { useEffect } from "react";
+
+declare global {
+  interface Window {
+    adsbygoogle: unknown[];
+  }
+}
+
 const ADSENSE_CLIENT_ID = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID;
 
 interface AdBannerProps {
@@ -6,10 +16,19 @@ interface AdBannerProps {
 }
 
 /**
- * Placeholder ad slot. Renders nothing meaningful until an AdSense client ID
- * is configured and the AdSense script is wired up in app/layout.tsx.
+ * Renders a placeholder box until an AdSense client ID is configured
+ * (NEXT_PUBLIC_ADSENSE_CLIENT_ID); once set, requests a real ad unit.
  */
 export default function AdBanner({ slot, className = "" }: AdBannerProps) {
+  useEffect(() => {
+    if (!ADSENSE_CLIENT_ID) return;
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch {
+      // AdSense script not loaded yet (e.g. blocked by an ad blocker); ignore.
+    }
+  }, []);
+
   if (!ADSENSE_CLIENT_ID) {
     return (
       <div

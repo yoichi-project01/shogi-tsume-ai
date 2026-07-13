@@ -5,6 +5,13 @@
 このファイルはClaude Code（および将来このリポジトリを触るエージェント）向けの申し送り事項です。
 要件定義書の全文は `C:\Users\234005\Documents\AI詰将棋トレーニングWebアプリ_要件定義書.md` を参照してください。
 
+## メンテナンス方針
+
+このファイルを編集するときは、現在の状況を常にこのファイルに記載し、解決済みの内容はこのファイルから削除
+すること。「ハマったポイント」のようなトラブルシュート履歴も、恒久的に有用な教訓（再発防止の知見）でない
+限り、問題が解決したら削除する。過去の作業ログを溜め込む場所ではなく、今この時点でのプロジェクトの状態を
+正確に映す文書として保つ。
+
 ## プロジェクト概要
 
 毎日挑戦できるAI詰将棋トレーニングWebアプリ。Next.js (App Router) / TypeScript / Tailwind CSS / Supabase
@@ -19,8 +26,13 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
 - **Netlify**: GitHubリポジトリ（`https://github.com/yoichi-project01/shogi-tsume-ai`, `master`ブランチ）を
   連携してデプロイ済み。ビルドコマンド `npm run build`、`@netlify/plugin-nextjs` 使用。
 - **Git**: `master` ブランチのみ。直近コミット `d19ed3f`（MVP一式）。リモート push 済み。
-- **未実装（フェーズ6相当、要件定義書参照）**: AI問題自動生成、AI解説生成の自動化、5手詰以上、称号/バッジ、
-  月間ランキング、管理者画面。
+- **問題の自動生成**: `lib/shogi/generator.ts` に実装済み。LLM（AI）は使わず、`lib/shogi/rules.ts` の合法手生成器
+  をそのまま使った全探索ソルバー（`solveForced`）で「詰み手順が一意」「gote応手が強制1択」「短手数の余詰めが
+  ない」ことを保証してから採用するアルゴリズム生成方式。`/api/daily` がその日最初にアクセスされた時点で
+  未生成なら生成→`puzzles`/`daily_challenges`テーブルへ保存（オンデマンド生成、Netlify Scheduled Functionは
+  未使用）。生成に失敗しても`lib/dailyPuzzle.ts`のサンプル問題にフォールバックする。
+- **未実装（フェーズ6相当、要件定義書参照）**: AI解説文生成の自動化（現状は`describeSolution`によるテンプレ
+  文言）、称号/バッジ、月間ランキング、管理者画面。
 
 ## ハマったポイント（デプロイ作業でのトラブルシュート履歴）
 
@@ -48,7 +60,7 @@ app/            画面・APIルート（Next.js App Router）
   mypage/, ranking/, terms/, privacy/, contact/
 components/     Board, Piece, Header, Footer, AdBanner, HintBox, ResultModal, PuzzleRunner
 hooks/          usePuzzleSession（1局分の状態管理。effect内setState/Date.now()を避けたNext.js16 lint対応版）
-lib/shogi/      将棋ルールエンジン（types / rules / validator / hints / puzzles）
+lib/shogi/      将棋ルールエンジン（types / rules / validator / hints / puzzles / generator）
 lib/score.ts    スコア計算ロジック（要件定義書11章）
 lib/dailyPuzzle.ts  日替わり問題選出（Supabase未接続時のフォールバック）
 lib/supabase/   Supabaseクライアント（client.ts=ブラウザ用, server.ts=サーバー用+service role）

@@ -8,7 +8,7 @@ export type PuzzleStatus =
   | "invalid_rule"
   | "invalid_other";
 
-export type GenerationType = "ai" | "manual";
+export type GenerationType = "ai" | "manual" | "algorithmic";
 
 /** Row shape for the `puzzles` table in Supabase. */
 export interface PuzzleRow {

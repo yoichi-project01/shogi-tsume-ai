@@ -40,21 +40,21 @@ export const SAMPLE_PUZZLES: Puzzle[] = [
   },
   {
     id: "3te-001",
-    title: "3手詰 その1（香で追って金で詰める）",
+    title: "3手詰 その1（捨て金からの寄せ）",
     moveCount: 3,
     difficulty: 3,
     initialBoard: board([
       [0, 0, { type: "OU", owner: "gote" }],
-      [2, 1, { type: "GI", owner: "sente" }],
+      [2, 0, { type: "GI", owner: "sente" }],
     ]),
-    initialHands: { sente: { KY: 1, KI: 1 }, gote: {} },
+    initialHands: { sente: { KI: 2 }, gote: {} },
     solution: [
-      { kind: "drop", piece: "KY", to: { row: 1, col: 0 }, color: "sente" },
+      { kind: "drop", piece: "KI", to: { row: 0, col: 1 }, color: "sente" },
       { kind: "board", from: { row: 0, col: 0 }, to: { row: 0, col: 1 }, promote: false, color: "gote" },
       { kind: "drop", piece: "KI", to: { row: 1, col: 1 }, color: "sente" },
     ],
     explanation:
-      "まず香を九二に打って王手をかけると、玉は八一へ逃げるしかありません（九二の駒は銀に守られているため取れず、八二は銀の利きが入っています）。次に金を八二に打つと、香・金・銀の利きで玉の逃げ場が完全になくなり詰みとなります。",
+      "まず八一に金を捨てるように打って王手をかけます。この金はどこにも守られていませんが、玉が他へ逃げることは九三の銀の利きでふさがれているため、玉はこの金を取るしかありません。玉が八一に来たところで、二枚目の金を八二に打ちます。この金は九三の銀に守られていて取れず、玉の逃げ場もすべて金の利きでふさがれているため、これで詰みです。",
   },
 ];
 

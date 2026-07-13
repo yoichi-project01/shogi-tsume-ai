@@ -60,12 +60,18 @@ create table if not exists public.puzzles (
   difficulty integer not null default 1,
   status text not null default 'unchecked'
     check (status in ('unchecked', 'valid', 'invalid_no_mate', 'invalid_dual_solution', 'invalid_rule', 'invalid_other')),
-  generation_type text not null default 'manual' check (generation_type in ('ai', 'manual')),
+  generation_type text not null default 'manual' check (generation_type in ('ai', 'manual', 'algorithmic')),
   explanation text,
   created_at timestamptz not null default now()
 );
 
 create index if not exists puzzles_status_difficulty_idx on public.puzzles (status, difficulty);
+
+-- Widen generation_type for projects provisioned before 'algorithmic' existed
+-- (safe to rerun on a fresh install: the constraint already matches).
+alter table public.puzzles drop constraint if exists puzzles_generation_type_check;
+alter table public.puzzles add constraint puzzles_generation_type_check
+  check (generation_type in ('ai', 'manual', 'algorithmic'));
 
 -- ---------------------------------------------------------------------------
 -- puzzle_attempts

@@ -1,6 +1,7 @@
 import { SAMPLE_PUZZLES } from "../lib/shogi/puzzles";
 import { createSession, submitMove } from "../lib/shogi/validator";
 import { isCheckmate, isInCheck } from "../lib/shogi/rules";
+import { generateDailyPuzzle } from "../lib/shogi/generator";
 
 let failures = 0;
 
@@ -39,6 +40,34 @@ for (const puzzle of SAMPLE_PUZZLES) {
   const wrongMove = { kind: "drop" as const, piece: "KI" as const, to: { row: 8, col: 8 }, color: "sente" as const };
   const result = submitMove(puzzle, session, wrongMove);
   assert(result.outcome === "incorrect", `wrong move on ${puzzle.id} rejected as incorrect`);
+}
+
+// Auto-generator: every generated puzzle must independently replay as a
+// legal, forced mate through the same validator used at runtime (guards
+// against subtly-wrong hand-derived templates producing cooked puzzles).
+console.log("\n--- generator: 15 generated puzzles ---");
+for (let i = 0; i < 15; i++) {
+  const generated = generateDailyPuzzle();
+  const puzzle = { id: `gen-check-${i}`, ...generated };
+  let session = createSession(puzzle);
+
+  assert(!isInCheck(session.state, "gote"), `[gen ${i}] gote not in check at start`);
+
+  let replayOk = true;
+  for (let m = 0; m < puzzle.solution.length; m += 2) {
+    const result = submitMove(puzzle, session, puzzle.solution[m]);
+    if (result.outcome !== "progress" && result.outcome !== "solved") {
+      assert(false, `[gen ${i}] move ${m} accepted (got ${result.outcome})`);
+      replayOk = false;
+      break;
+    }
+    session = result.session;
+  }
+
+  if (replayOk) {
+    assert(session.finished && session.success, `[gen ${i}] puzzle ends solved`);
+    assert(isCheckmate(session.state, "gote"), `[gen ${i}] final position is checkmate`);
+  }
 }
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);

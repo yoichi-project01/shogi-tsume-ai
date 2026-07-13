@@ -4,6 +4,20 @@ import { SAMPLE_PUZZLES } from "@/lib/shogi/puzzles";
 import { createSession, submitMove } from "@/lib/shogi/validator";
 import { calculateScore } from "@/lib/score";
 import type { Move, Puzzle } from "@/lib/shogi/types";
+import type { PuzzleRow } from "@/types/puzzle";
+
+function puzzleFromRow(row: PuzzleRow): Puzzle {
+  return {
+    id: row.id,
+    title: row.title,
+    moveCount: row.move_count as Puzzle["moveCount"],
+    difficulty: row.difficulty,
+    initialBoard: row.board_state,
+    initialHands: row.hand_pieces,
+    solution: row.solution as Move[],
+    explanation: row.explanation ?? "",
+  };
+}
 
 interface AttemptPayload {
   puzzleId: string;
@@ -39,7 +53,19 @@ export async function POST(request: Request) {
     user = null;
   }
 
-  const puzzle: Puzzle | undefined = SAMPLE_PUZZLES.find((p) => p.id === body.puzzleId);
+  let puzzle: Puzzle | undefined = SAMPLE_PUZZLES.find((p) => p.id === body.puzzleId);
+
+  // Not one of the bundled samples — it may be a generated puzzle stored in Supabase.
+  if (!puzzle && supabase) {
+    const { data: row } = await supabase
+      .from("puzzles")
+      .select("*")
+      .eq("id", body.puzzleId)
+      .eq("status", "valid")
+      .maybeSingle();
+    if (row) puzzle = puzzleFromRow(row as PuzzleRow);
+  }
+
   if (!puzzle) {
     return NextResponse.json({ error: "puzzle not found" }, { status: 404 });
   }

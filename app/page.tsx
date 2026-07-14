@@ -1,10 +1,12 @@
 import Link from "next/link";
 import AdBanner from "@/components/AdBanner";
 import { SAMPLE_PUZZLES } from "@/lib/shogi/puzzles";
+import { isLoggedIn } from "@/lib/supabase/server";
 
-export default function Home() {
+export default async function Home() {
   const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
   const dailyPuzzle = SAMPLE_PUZZLES[0];
+  const loggedIn = await isLoggedIn();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
@@ -17,24 +19,35 @@ export default function Home() {
         </p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link
-            href="/play"
-            className="rounded bg-amber-600 px-6 py-3 font-bold text-white hover:bg-amber-700"
-          >
-            今すぐゲストプレイ
-          </Link>
-          <Link
-            href="/signup"
-            className="rounded border border-amber-600 px-6 py-3 font-bold text-amber-700 hover:bg-amber-50"
-          >
-            新規登録
-          </Link>
-          <Link
-            href="/login"
-            className="rounded border border-neutral-300 px-6 py-3 font-bold text-neutral-700 hover:bg-neutral-50"
-          >
-            ログイン
-          </Link>
+          {loggedIn ? (
+            <Link
+              href="/play"
+              className="rounded bg-amber-600 px-6 py-3 font-bold text-white hover:bg-amber-700"
+            >
+              詰将棋を解く
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/play"
+                className="rounded bg-amber-600 px-6 py-3 font-bold text-white hover:bg-amber-700"
+              >
+                今すぐゲストプレイ
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded border border-amber-600 px-6 py-3 font-bold text-amber-700 hover:bg-amber-50"
+              >
+                新規登録
+              </Link>
+              <Link
+                href="/login"
+                className="rounded border border-neutral-300 px-6 py-3 font-bold text-neutral-700 hover:bg-neutral-50"
+              >
+                ログイン
+              </Link>
+            </>
+          )}
         </div>
       </section>
 

@@ -248,3 +248,15 @@ export function generateDailyPuzzle(): GeneratedPuzzle {
   if (!result) throw new Error("failed to generate a daily puzzle");
   return result;
 }
+
+/**
+ * Generates one puzzle at a specific difficulty tier (unlike
+ * generateDailyPuzzle, this never silently substitutes an easier tier —
+ * callers that need a particular level should retry on null rather than
+ * receive a mislabeled result).
+ */
+export function generatePuzzleForLevel(level: 1 | 3 | 5): GeneratedPuzzle | null {
+  if (level === 1) return buildOneMovePuzzle();
+  if (level === 3) return buildThreeMovePuzzle();
+  return buildFiveMovePuzzle();
+}

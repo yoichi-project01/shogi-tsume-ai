@@ -13,6 +13,7 @@ interface PuzzleRunnerProps {
   streak: number;
   adSlot: string;
   showStreak?: boolean;
+  nextLabel?: string;
   onSolved: () => void;
   onResigned: () => void;
   onNext: () => void;
@@ -24,6 +25,7 @@ export default function PuzzleRunner({
   streak,
   adSlot,
   showStreak = true,
+  nextLabel,
   onSolved,
   onResigned,
   onNext,
@@ -87,6 +89,7 @@ export default function PuzzleRunner({
           score={finalScore}
           answerTimeSeconds={answerTimeSeconds}
           hintsUsed={session.hintsUsed}
+          nextLabel={nextLabel}
           onNext={onNext}
           onRetry={onRetry}
         />

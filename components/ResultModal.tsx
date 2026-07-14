@@ -11,6 +11,7 @@ interface ResultModalProps {
   score: ScoreBreakdown;
   answerTimeSeconds: number;
   hintsUsed: number;
+  nextLabel?: string;
   onNext: () => void;
   onRetry: () => void;
 }
@@ -21,6 +22,7 @@ export default function ResultModal({
   score,
   answerTimeSeconds,
   hintsUsed,
+  nextLabel = "次の問題へ",
   onNext,
   onRetry,
 }: ResultModalProps) {
@@ -61,7 +63,7 @@ export default function ResultModal({
                 onClick={onNext}
                 className="flex-1 rounded bg-amber-600 px-4 py-2 font-bold text-white hover:bg-amber-700"
               >
-                次の問題へ
+                {nextLabel}
               </button>
               <Link
                 href="/mypage"

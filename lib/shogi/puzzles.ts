@@ -1,5 +1,6 @@
-import type { Board, Puzzle } from "./types";
+import type { Board, Move, Puzzle } from "./types";
 import { emptyBoard } from "./rules";
+import type { PuzzleRow } from "@/types/puzzle";
 
 function board(pieces: Array<[number, number, Board[number][number]]>): Board {
   const b = emptyBoard();
@@ -60,4 +61,18 @@ export const SAMPLE_PUZZLES: Puzzle[] = [
 
 export function getPuzzleById(id: string): Puzzle | undefined {
   return SAMPLE_PUZZLES.find((p) => p.id === id);
+}
+
+/** Maps a Supabase `puzzles` row onto the shape the rule engine/UI work with. */
+export function puzzleFromRow(row: PuzzleRow): Puzzle {
+  return {
+    id: row.id,
+    title: row.title,
+    moveCount: row.move_count as Puzzle["moveCount"],
+    difficulty: row.difficulty,
+    initialBoard: row.board_state,
+    initialHands: row.hand_pieces,
+    solution: row.solution as Move[],
+    explanation: row.explanation ?? "",
+  };
 }

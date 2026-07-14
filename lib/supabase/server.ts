@@ -36,3 +36,16 @@ export function createServiceRoleClient() {
     { auth: { persistSession: false } },
   );
 }
+
+/** Whether the current request has a logged-in Supabase user (false if Supabase is unavailable). */
+export async function isLoggedIn(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return Boolean(user);
+  } catch {
+    return false;
+  }
+}

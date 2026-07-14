@@ -1,23 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { SAMPLE_PUZZLES } from "@/lib/shogi/puzzles";
+import { SAMPLE_PUZZLES, puzzleFromRow } from "@/lib/shogi/puzzles";
 import { createSession, submitMove } from "@/lib/shogi/validator";
 import { calculateScore } from "@/lib/score";
+import { ensurePoolStocked } from "@/lib/puzzlePool";
 import type { Move, Puzzle } from "@/lib/shogi/types";
 import type { PuzzleRow } from "@/types/puzzle";
-
-function puzzleFromRow(row: PuzzleRow): Puzzle {
-  return {
-    id: row.id,
-    title: row.title,
-    moveCount: row.move_count as Puzzle["moveCount"],
-    difficulty: row.difficulty,
-    initialBoard: row.board_state,
-    initialHands: row.hand_pieces,
-    solution: row.solution as Move[],
-    explanation: row.explanation ?? "",
-  };
-}
 
 interface AttemptPayload {
   puzzleId: string;
@@ -118,6 +106,16 @@ export async function POST(request: Request) {
     });
 
     await supabase.from("profiles").update({ current_streak: nextStreak }).eq("id", user.id);
+
+    // Best-effort: if this clears out the last unsolved puzzle at this
+    // difficulty, top the pool back up. Runs after the response is sent so
+    // it can't add latency, and any failure here is intentionally swallowed
+    // inside ensurePoolStocked.
+    if (isCorrect) {
+      const { difficulty } = puzzle;
+      const userId = user.id;
+      after(() => ensurePoolStocked(difficulty, userId));
+    }
   }
 
   return NextResponse.json({ isCorrect, score, streak: nextStreak });

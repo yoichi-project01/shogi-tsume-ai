@@ -1,13 +1,18 @@
 import Link from "next/link";
+import { isLoggedIn } from "@/lib/supabase/server";
+import LogoutButton from "./LogoutButton";
 
 const NAV_LINKS = [
   { href: "/play", label: "詰将棋を解く" },
   { href: "/daily", label: "デイリーチャレンジ" },
+  { href: "/puzzles", label: "問題集" },
   { href: "/ranking", label: "ランキング" },
   { href: "/mypage", label: "マイページ" },
 ];
 
-export default function Header() {
+export default async function Header() {
+  const loggedIn = await isLoggedIn();
+
   return (
     <header className="border-b border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
@@ -20,12 +25,16 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/login"
-            className="rounded bg-amber-600 px-3 py-1.5 font-bold text-white hover:bg-amber-700"
-          >
-            ログイン
-          </Link>
+          {loggedIn ? (
+            <LogoutButton />
+          ) : (
+            <Link
+              href="/login"
+              className="rounded bg-amber-600 px-3 py-1.5 font-bold text-white hover:bg-amber-700"
+            >
+              ログイン
+            </Link>
+          )}
         </nav>
       </div>
     </header>

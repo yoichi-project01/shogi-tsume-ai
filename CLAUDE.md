@@ -30,7 +30,18 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   をそのまま使った全探索ソルバー（`solveForced`）で「詰み手順が一意」「gote応手が強制1択」「短手数の余詰めが
   ない」ことを保証してから採用するアルゴリズム生成方式。`/api/daily` がその日最初にアクセスされた時点で
   未生成なら生成→`puzzles`/`daily_challenges`テーブルへ保存（オンデマンド生成、Netlify Scheduled Functionは
-  未使用）。生成に失敗しても`lib/dailyPuzzle.ts`のサンプル問題にフォールバックする。
+  未使用）。生成に失敗しても`lib/dailyPuzzle.ts`のサンプル問題にフォールバックする。本番Supabaseへの実保存を
+  `npm run seed:puzzles`（`scripts/backfill-puzzles.ts`、過去日付ぶんをまとめてバックフィル）で実地確認済み。
+- **問題集**: `/puzzles`（一覧）・`/puzzles/[id]`（個別プレイ）を実装済み。`status='valid'`な`puzzles`を
+  難易度→作成日時の順で一覧表示（デイリーチャレンジ由来のものは日付も表示）、Lv.1/3/5のタブで絞り込み可能。
+  ログイン中は`puzzle_attempts`（`is_correct=true`）と突き合わせて解答済みバッジを表示する。Supabase未接続/
+  データなしの場合は`SAMPLE_PUZZLES`3問にフォールバックする。日付に紐付かない練習用プールを
+  `npm run seed:levels`（`scripts/generate-level-puzzles.ts`）でレベルごとにまとめて補充できる（Lv.1/3/5に
+  各30件以上投入済み）。あるユーザーがそのレベルの未解答問題を解き尽くすと、`/api/attempts`が
+  `lib/puzzlePool.ts`の`ensurePoolStocked`をレスポンス後（`next/server`の`after`）にバックグラウンドで呼び、
+  同レベルの問題を自動で10件補充する。
+- **解答記録**: `hooks/usePuzzleSession.ts`が問題を解く/投了するたびに`/api/attempts`へPOSTするようになった
+  （以前はこのAPIがどこからも呼ばれておらず、成績が一切記録されていなかった）。
 - **未実装（フェーズ6相当、要件定義書参照）**: AI解説文生成の自動化（現状は`describeSolution`によるテンプレ
   文言）、称号/バッジ、月間ランキング、管理者画面。
 
@@ -46,6 +57,12 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
 - **Netlifyの`NEXT_PUBLIC_*`環境変数はビルド時に埋め込まれる**: 環境変数をNetlify側で変更しただけでは
   反映されず、**「Trigger deploy → Clear cache and deploy site」で再デプロイが必須**（キャッシュ付き再デプロイ
   でないと古いビルド成果物が使われ続けることがある）。
+- **`schema.sql`を編集しても本番DBには自動反映されない**: CHECK制約に新しい値を追加するなど`schema.sql`を
+  更新しても、既にプロビジョニング済みのSupabaseプロジェクトには手動でSQLを実行するまで反映されない。
+  これに気づかず`generation_type`に`'algorithmic'`を追加した際、本番DBの制約が古いままだったため
+  `/api/daily`の保存が毎回サイレントに失敗し続けた（`try/catch`でサンプル問題にフォールバックするため
+  エラーが表面化しなかった）。スキーマ変更時は必ずSupabaseダッシュボードのSQL Editorで対応する
+  `ALTER TABLE`まで実行すること。
 - **重要**: 過去のやり取りでSupabaseの `anon key` と `service_role key` を平文でチャットに貼ってしまった経緯が
   あるため、**ローテーション（再生成）推奨**を伝達済み。再生成した場合は `.env.local` とNetlify両方の値を
   更新すること。`.env.local` はコミット対象外（`.gitignore`で除外、`.env.local.example`のみ追跡）。
@@ -55,18 +72,23 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
 ```text
 app/            画面・APIルート（Next.js App Router）
   api/            puzzles/next, attempts（サーバー側再検証）, ranking, daily, contact
-  play/, daily/   PuzzleRunnerコンポーネントを利用した対局ページ
+  play/, daily/, puzzles/, puzzles/[id]/   PuzzleRunnerコンポーネントを利用した対局ページ
   login/, signup/, reset-password/, auth/callback/  Supabase Auth
   mypage/, ranking/, terms/, privacy/, contact/
-components/     Board, Piece, Header, Footer, AdBanner, HintBox, ResultModal, PuzzleRunner
+components/     Board, Piece, Header, Footer, AdBanner, HintBox, ResultModal, PuzzleRunner,
+                ArchivePuzzleRunner（問題集の個別プレイ）, LogoutButton
 hooks/          usePuzzleSession（1局分の状態管理。effect内setState/Date.now()を避けたNext.js16 lint対応版）
 lib/shogi/      将棋ルールエンジン（types / rules / validator / hints / puzzles / generator）
 lib/score.ts    スコア計算ロジック（要件定義書11章）
 lib/dailyPuzzle.ts  日替わり問題選出（Supabase未接続時のフォールバック）
+lib/dailyChallenge.ts  デイリーチャレンジの取得/生成（/api/daily と /daily ページ共通）
+lib/puzzlePool.ts  問題プールの補充ロジック（生成→保存の共通処理、レベル別の枯渇検知）
 lib/supabase/   Supabaseクライアント（client.ts=ブラウザ用, server.ts=サーバー用+service role）
 types/          Supabaseテーブルに対応する型定義
 supabase/       DBスキーマ・RLSポリシーSQL（schema.sql）
 scripts/verify-engine.ts  将棋エンジンの自己検証スクリプト（`npm run verify:engine`）
+scripts/backfill-puzzles.ts  デイリー問題の一括生成・バックフィル（`npm run seed:puzzles -- [件数]`）
+scripts/generate-level-puzzles.ts  レベル別（1/3/5手詰）の練習プールを一括生成（`npm run seed:levels -- [件数]`）
 ```
 
 ## よく使うコマンド
@@ -76,6 +98,8 @@ npm run dev            # 開発サーバー
 npm run build           # 本番ビルド（型チェック含む）
 npm run lint             # ESLint
 npm run verify:engine    # 詰将棋ルールエンジンの自己検証（サンプル問題を実際に解いて詰みまで確認）
+npm run seed:puzzles     # デイリー問題を過去日付ぶんまとめて生成・保存（.env.localのSupabase設定が必要）
+npm run seed:levels      # 練習プール問題をレベル別にまとめて生成・保存（同上）
 ```
 
 ## 設計上の注意点

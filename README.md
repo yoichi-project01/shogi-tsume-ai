@@ -14,6 +14,9 @@
 - ✅ 利用規約・プライバシーポリシー・お問い合わせページ
 - ✅ 日替わり問題の自動生成（[`lib/shogi/generator.ts`](./lib/shogi/generator.ts)、LLM不使用のアルゴリズム生成
   ＋ルールエンジンによる詰み手順の全探索検証、1・3・5手詰対応）
+- ✅ 問題集（`/puzzles` 一覧・`/puzzles/[id]` 個別プレイ）: デイリー問題とレベル別練習プールをまとめてLv.1/3/5で
+  絞り込み表示。ログイン中は解答済みバッジを表示し、あるレベルを全問解き終えたユーザーがいれば
+  `/api/attempts` がバックグラウンドで同レベルの問題を自動補充する（[`lib/puzzlePool.ts`](./lib/puzzlePool.ts)）
 - ⏳ 未実装（フェーズ6相当）: AI解説生成の自動化、称号/バッジ、月間ランキング、管理者画面
 
 サンプル問題は [`lib/shogi/puzzles.ts`](./lib/shogi/puzzles.ts) にハードコードされており（1手詰×2、3手詰×1）、
@@ -56,10 +59,12 @@ components/     Board, Piece, HintBox, ResultModal などのUI部品
 hooks/          usePuzzleSession（問題を解く一連のフローを管理）
 lib/shogi/      将棋ルールエンジン（types / rules / validator / hints / puzzles / generator）
 lib/score.ts    スコア計算ロジック（要件定義書 11章に対応）
+lib/dailyChallenge.ts  デイリーチャレンジの取得/生成
+lib/puzzlePool.ts      問題プールの補充ロジック
 lib/supabase/   Supabaseクライアント（ブラウザ用・サーバー用）
 types/          Supabaseテーブルに対応する型定義
 supabase/       DBスキーマ・RLSポリシーのSQL
-scripts/        エンジン検証用スクリプト
+scripts/        エンジン検証・問題一括生成用スクリプト（`npm run seed:puzzles` / `npm run seed:levels`）
 ```
 
 ## 技術構成

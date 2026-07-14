@@ -28,10 +28,16 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
 - **Git**: `master` ブランチのみ。直近コミット `d19ed3f`（MVP一式）。リモート push 済み。
 - **問題の自動生成**: `lib/shogi/generator.ts` に実装済み。LLM（AI）は使わず、`lib/shogi/rules.ts` の合法手生成器
   をそのまま使った全探索ソルバー（`solveForced`）で「詰み手順が一意」「gote応手が強制1択」「短手数の余詰めが
-  ない」ことを保証してから採用するアルゴリズム生成方式。`/api/daily` がその日最初にアクセスされた時点で
-  未生成なら生成→`puzzles`/`daily_challenges`テーブルへ保存（オンデマンド生成、Netlify Scheduled Functionは
-  未使用）。生成に失敗しても`lib/dailyPuzzle.ts`のサンプル問題にフォールバックする。本番Supabaseへの実保存を
-  `npm run seed:puzzles`（`scripts/backfill-puzzles.ts`、過去日付ぶんをまとめてバックフィル）で実地確認済み。
+  ない」ことを保証してから採用するアルゴリズム生成方式。正式な詰将棋ルール（王手は必ずかける／後手は合駒に
+  盤上と先手の持ち駒以外の全ての駒を使える／最長の手数で逃げる）も`hasLiveAigomaOption`等で反映済み（合駒が
+  現実的に可能な間合いの空いた王手は候補から除外する形で対応。「無駄合」の厳密な判定はしていない）。`/api/daily`
+  がその日最初にアクセスされた時点で未生成なら生成→`puzzles`/`daily_challenges`テーブルへ保存（オンデマンド
+  生成、Netlify Scheduled Functionは未使用）。生成に失敗しても`lib/dailyPuzzle.ts`のサンプル問題にフォール
+  バックする。本番Supabaseへの実保存を`npm run seed:puzzles`（`scripts/backfill-puzzles.ts`、過去日付ぶんを
+  まとめてバックフィル）で実地確認済み。5手詰は正しいチェックだと生成の成功率が下がるため（試行回数800→1200等
+  で調整）、`/api/daily`は生成失敗時に3手詰・1手詰へ自動でフォールバックする設計。
+- **中間手を間違えたときの表示**: `submitMove`が返す`isFinalAttempt`フラグにより、最終手（詰みを狙う手）以外
+  を間違えても「不正解です」は表示せず、黙って同じ局面で再挑戦できる（`hooks/usePuzzleSession.ts`）。
 - **問題集**: `/puzzles`（一覧）・`/puzzles/[id]`（個別プレイ）を実装済み。`status='valid'`な`puzzles`を
   難易度→作成日時の順で一覧表示（デイリーチャレンジ由来のものは日付も表示）、Lv.1/3/5のタブで絞り込み可能。
   ログイン中は`puzzle_attempts`（`is_correct=true`）と突き合わせて解答済みバッジを表示する。Supabase未接続/
@@ -63,6 +69,13 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   `/api/daily`の保存が毎回サイレントに失敗し続けた（`try/catch`でサンプル問題にフォールバックするため
   エラーが表面化しなかった）。スキーマ変更時は必ずSupabaseダッシュボードのSQL Editorで対応する
   `ALTER TABLE`まで実行すること。
+- **余詰め（cook）検出は「一意解なし」と「解なし」を区別すること**: `lib/shogi/generator.ts`の`solveForced`は
+  当初、短手数の余詰めチェックに`solveExact`（唯一解を要求する関数）を流用していたが、`solveExact`は「短手数の
+  詰みが存在しない」場合と「短手数の詰みの手段が複数（曖昧）存在する」場合の両方で`null`を返すため、後者
+  （実際には余詰めがある）を誤って「問題なし」と判定してしまっていた。本番の自動生成問題129件中58件（3手詰・
+  5手詰）がこのバグの影響で実際には1手詰めなどが混在しており、`invalid_dual_solution`に無効化して生成し直した。
+  存在チェック専用の`hasForcedMateWithin`（唯一性を問わない）を別途用意して修正済み。今後ソルバー系のロジックを
+  触る際は、「唯一解を要求する関数」と「存在確認だけでよい関数」を混同しないこと。
 - **重要**: 過去のやり取りでSupabaseの `anon key` と `service_role key` を平文でチャットに貼ってしまった経緯が
   あるため、**ローテーション（再生成）推奨**を伝達済み。再生成した場合は `.env.local` とNetlify両方の値を
   更新すること。`.env.local` はコミット対象外（`.gitignore`で除外、`.env.local.example`のみ追跡）。

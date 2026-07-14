@@ -41,21 +41,21 @@ export const SAMPLE_PUZZLES: Puzzle[] = [
   },
   {
     id: "3te-001",
-    title: "3手詰 その1（捨て金からの寄せ）",
+    title: "3手詰 その1（銀捨てから龍で寄せ）",
     moveCount: 3,
     difficulty: 3,
     initialBoard: board([
-      [0, 0, { type: "OU", owner: "gote" }],
-      [2, 0, { type: "GI", owner: "sente" }],
+      [0, 8, { type: "OU", owner: "gote" }],
+      [2, 7, { type: "HI", owner: "sente" }],
     ]),
-    initialHands: { sente: { KI: 2 }, gote: {} },
+    initialHands: { sente: { GI: 1 }, gote: {} },
     solution: [
-      { kind: "drop", piece: "KI", to: { row: 0, col: 1 }, color: "sente" },
-      { kind: "board", from: { row: 0, col: 0 }, to: { row: 0, col: 1 }, promote: false, color: "gote" },
-      { kind: "drop", piece: "KI", to: { row: 1, col: 1 }, color: "sente" },
+      { kind: "drop", piece: "GI", to: { row: 1, col: 7 }, color: "sente" },
+      { kind: "board", from: { row: 0, col: 8 }, to: { row: 1, col: 8 }, promote: false, color: "gote" },
+      { kind: "board", from: { row: 2, col: 7 }, to: { row: 2, col: 8 }, promote: true, color: "sente" },
     ],
     explanation:
-      "まず八一に金を捨てるように打って王手をかけます。この金はどこにも守られていませんが、玉が他へ逃げることは九三の銀の利きでふさがれているため、玉はこの金を取るしかありません。玉が八一に来たところで、二枚目の金を八二に打ちます。この金は九三の銀に守られていて取れず、玉の逃げ場もすべて金の利きでふさがれているため、これで詰みです。",
+      "まず二二に銀を打って王手をかけます。この銀は二三の飛に守られているため取れず、玉は一二へ逃げるしかありません。玉が一二に来たところで、二三の飛を一三へ成って龍にします。龍は玉のいる一二のマスをにらんでおり、玉の逃げ場となる一一・二二・二三はすべて銀か龍の利きでふさがれているため、これで詰みです。",
   },
 ];
 

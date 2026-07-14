@@ -1,5 +1,5 @@
-import type { Color, GameState, Hand, Move, Puzzle } from "./types";
-import { applyMove, emptyBoard, generateLegalMoves, isCheckmate, isInCheck, PIECE_KANJI } from "./rules";
+import type { BasePieceType, Color, GameState, Hand, Move, PieceType, Position, Puzzle } from "./types";
+import { applyMove, baseType, BOARD_SIZE, emptyBoard, findKing, generateLegalMoves, inBounds, isCheckmate, isInCheck, PIECE_KANJI } from "./rules";
 import { squareLabel } from "./hints";
 
 /** Piece types this generator draws from when composing attacker material. */
@@ -7,6 +7,105 @@ type AttackPiece = "KI" | "GI" | "KY" | "KE" | "HI" | "KA";
 
 /** Max copies of each type available in a real shogi set (keeps generated boards realistic). */
 const PIECE_LIMITS: Record<AttackPiece, number> = { KI: 2, GI: 2, KY: 2, KE: 2, HI: 1, KA: 1 };
+
+type DroppableType = Exclude<BasePieceType, "OU">;
+
+/** Copies of each piece type in a standard shogi set (used only for the 合駒/aigoma rule below). */
+const FULL_SET_LIMITS: Record<DroppableType, number> = { FU: 9, KY: 2, KE: 2, GI: 2, KI: 2, KA: 1, HI: 1 };
+
+/**
+ * Formal tsume-shogi rule: the defender (gote) may use ANY piece not already
+ * on the board or in the attacker's (sente's) hand — drawn from a standard
+ * set, regardless of what actually happened in this specific position — as
+ * an interposing piece (合駒) against a check from a sliding piece. This
+ * engine's real gameplay rules (lib/shogi/rules.ts) correctly do NOT grant
+ * gote this composition-only privilege (gote only ever has what's actually
+ * in its hand), so it's modeled here in the generator/solver instead, which
+ * is responsible for verifying a candidate is a well-formed problem.
+ */
+function availableAigomaTypes(state: GameState): DroppableType[] {
+  const used: Record<DroppableType, number> = { FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0 };
+
+  for (const row of state.board) {
+    for (const sq of row) {
+      if (sq && sq.type !== "OU") used[baseType(sq.type) as DroppableType]++;
+    }
+  }
+  for (const [type, count] of Object.entries(state.hands.sente)) {
+    used[type as DroppableType] += count ?? 0;
+  }
+
+  return (Object.keys(FULL_SET_LIMITS) as DroppableType[]).filter((type) => used[type] < FULL_SET_LIMITS[type]);
+}
+
+/** Sliding step directions for a sente-owned piece, or [] if it doesn't slide (this engine's generated
+ * puzzles never give gote attacking pieces, so gote-owned sliders never need to be considered here). */
+function senteSlidingDirections(type: PieceType): [number, number][] {
+  switch (type) {
+    case "KY":
+      return [[-1, 0]];
+    case "HI":
+    case "RY":
+      return [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ];
+    case "KA":
+    case "UM":
+      return [
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1],
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * True if gote's king is currently checked by a sliding piece with at least
+ * one empty square between them (i.e. interposition is geometrically
+ * possible) AND gote has some available 合駒 type to drop there. This
+ * engine doesn't model the resulting position (whether the block would
+ * actually hold, or is "無駄合" — a useless block that doesn't change the
+ * outcome) — it's used only to disqualify candidates where that recursion
+ * would matter, rather than risk asserting a "forced" line that a real
+ * tsume-shogi solver would need to check an interposition branch for.
+ */
+function hasLiveAigomaOption(state: GameState): boolean {
+  const king = findKing(state.board, "gote");
+  if (!king) return false;
+
+  let gapExists = false;
+  for (let row = 0; row < BOARD_SIZE && !gapExists; row++) {
+    for (let col = 0; col < BOARD_SIZE && !gapExists; col++) {
+      const piece = state.board[row][col];
+      if (!piece || piece.owner !== "sente") continue;
+
+      for (const [dr, dc] of senteSlidingDirections(piece.type)) {
+        const gap: Position[] = [];
+        let r = row + dr;
+        let c = col + dc;
+        while (inBounds({ row: r, col: c })) {
+          if (r === king.row && c === king.col) {
+            if (gap.length > 0) gapExists = true;
+            break;
+          }
+          if (state.board[r][c]) break; // blocked before reaching the king: not a checking line
+          gap.push({ row: r, col: c });
+          r += dr;
+          c += dc;
+        }
+        if (gapExists) break;
+      }
+    }
+  }
+
+  return gapExists && availableAigomaTypes(state).length > 0;
+}
 
 function randomInt(n: number): number {
   return Math.floor(Math.random() * n);
@@ -45,9 +144,44 @@ function piecePool(): AttackPiece[] {
 export function solveForced(state: GameState, plyCount: number): Move[] | null {
   if (isInCheck(state, "gote")) return null;
   for (let shorter = 1; shorter < plyCount; shorter += 2) {
-    if (solveExact(state, shorter) !== null) return null;
+    if (hasForcedMateWithin(state, shorter)) return null;
   }
   return solveExact(state, plyCount);
+}
+
+/**
+ * Existence-only cousin of solveExact: true if sente can force mate in
+ * exactly `plyRemaining` plies by *some* means, regardless of whether that
+ * route is unique. Used solely for cook-detection, where solveExact's
+ * null-on-duplicate behavior is the wrong signal — a position with two
+ * different ways to mate in 1 is still mate-in-1, and must disqualify a
+ * candidate exactly as much as a single unambiguous shorter mate would
+ * (solveExact alone would miss this, since it collapses "no mate" and
+ * "ambiguous mate" to the same null return).
+ */
+export function hasForcedMateWithin(state: GameState, plyRemaining: number): boolean {
+  const senteMoves = generateLegalMoves(state, "sente");
+
+  for (const move of senteMoves) {
+    const after = applyMove(state, move);
+
+    if (plyRemaining === 1) {
+      if (isCheckmate(after, "gote") && !hasLiveAigomaOption(after)) return true;
+      continue;
+    }
+
+    if (!isInCheck(after, "gote") || hasLiveAigomaOption(after)) continue;
+
+    const goteMoves = generateLegalMoves(after, "gote");
+    if (goteMoves.length === 0) continue; // mate already happened at a shallower depth; not this exact ply count
+
+    const allRepliesStillLose = goteMoves.every((goteMove) =>
+      hasForcedMateWithin(applyMove(after, goteMove), plyRemaining - 2),
+    );
+    if (allRepliesStillLose) return true;
+  }
+
+  return false;
 }
 
 function solveExact(state: GameState, plyRemaining: number): Move[] | null {
@@ -58,7 +192,10 @@ function solveExact(state: GameState, plyRemaining: number): Move[] | null {
     const after = applyMove(state, move);
 
     if (plyRemaining === 1) {
-      if (!isCheckmate(after, "gote")) continue;
+      // A position that looks like checkmate under this engine's rules isn't
+      // real tsume-shogi checkmate if gote could still interpose (合駒) —
+      // see hasLiveAigomaOption.
+      if (!isCheckmate(after, "gote") || hasLiveAigomaOption(after)) continue;
       if (found) return null; // dual mate at this node
       found = [move];
       continue;
@@ -67,7 +204,11 @@ function solveExact(state: GameState, plyRemaining: number): Move[] | null {
     // Real tsume-shogi requires every attacker move to check the king — without
     // this, a "forced" reply could just be the king's only legal square for
     // some unrelated reason, which wouldn't read as a genuine checking sequence.
-    if (!isInCheck(after, "gote")) continue;
+    // A live 合駒 (interposition) option also disqualifies this move: this
+    // engine doesn't model whether gote's block would actually hold or is a
+    // "無駄合" (useless block), so any position where it's geometrically live
+    // is treated as unsuitable rather than risking an unverified "forced" line.
+    if (!isInCheck(after, "gote") || hasLiveAigomaOption(after)) continue;
 
     const goteMoves = generateLegalMoves(after, "gote");
     if (goteMoves.length !== 1) continue; // must be a single forced reply
@@ -225,11 +366,19 @@ function buildRandomPuzzle(
 }
 
 function buildThreeMovePuzzle(): GeneratedPuzzle | null {
-  return buildRandomPuzzle(3, 200, [2, 3], [1, 2]);
+  return buildRandomPuzzle(3, 400, [2, 3], [1, 2]);
 }
 
 function buildFiveMovePuzzle(): GeneratedPuzzle | null {
-  return buildRandomPuzzle(5, 300, [3, 4], [1, 2]);
+  // Correct cook-detection (hasForcedMateWithin, plus the 合駒/aigoma check
+  // in hasLiveAigomaOption) rejects far more random candidates than the old
+  // checks did, so this needs a much larger search budget than the 3-move
+  // tier to stay reliable. Capped well below what would guarantee ~100%
+  // success, since a single call sits in the request path of /api/daily and
+  // in a bounded background batch in ensurePoolStocked — callers that need a
+  // 5-move puzzle should tolerate occasional null and retry or fall back,
+  // rather than this growing unboundedly slow chasing the last few percent.
+  return buildRandomPuzzle(5, 1200, [3, 4], [1, 2]);
 }
 
 /**

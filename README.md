@@ -6,7 +6,8 @@
 
 - ✅ 詰将棋ルールエンジン（合法手生成・王手判定・詰み判定・打ち歩詰め判定）: [`lib/shogi/`](./lib/shogi)
 - ✅ 将棋盤UI・持ち駒・成り選択・ヒント・結果画面: [`components/`](./components)
-- ✅ ゲストプレイ（`/play`）・デイリーチャレンジ（`/daily`、サンプル問題を日替わりで選択）
+- ✅ ゲストプレイ（`/play`、難易度セレクター付き）・デイリーチャレンジ（`/daily`、その日最初のアクセス時に
+  問題を自動生成して保存。Supabase未接続時はサンプル問題にフォールバック）
 - ✅ Supabase Auth によるログイン・新規登録・パスワードリセット
 - ✅ マイページ（ログイン時に成績を表示、未ログイン時は誘導）
 - ✅ ランキング画面（現状はサンプルデータ表示）
@@ -44,7 +45,8 @@ npm run dev
 1. [supabase.com](https://supabase.com) でプロジェクトを作成
 2. SQL Editor で [`supabase/schema.sql`](./supabase/schema.sql) を実行（テーブル・RLSポリシー・プロフィール自動作成トリガーを作成）
 3. `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` を設定
-4. 必要に応じて `puzzles` / `daily_challenges` テーブルに検証済み問題を投入
+4. 必要に応じて `npm run seed:puzzles`（デイリー問題の日付別バックフィル）・`npm run seed:levels`
+   （レベル別の練習プール一括生成）で問題を投入
 
 ## Netlifyへのデプロイ
 

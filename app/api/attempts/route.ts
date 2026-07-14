@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   });
 
   if (user && supabase) {
-    await supabase.from("puzzle_attempts").insert({
+    const { error: insertError } = await supabase.from("puzzle_attempts").insert({
       user_id: user.id,
       puzzle_id: puzzle.id,
       is_correct: isCorrect,
@@ -107,11 +107,14 @@ export async function POST(request: Request) {
 
     await supabase.from("profiles").update({ current_streak: nextStreak }).eq("id", user.id);
 
-    // Best-effort: if this clears out the last unsolved puzzle at this
-    // difficulty, top the pool back up. Runs after the response is sent so
-    // it can't add latency, and any failure here is intentionally swallowed
-    // inside ensurePoolStocked.
-    if (isCorrect) {
+    // Best-effort: if this newly-recorded correct attempt clears out the
+    // last unsolved puzzle at this difficulty, top the pool back up. Only
+    // fires on a real insert (not e.g. a duplicate resubmission of an
+    // already-solved puzzle, which the DB rejects via
+    // puzzle_attempts_first_correct_idx) so repeatedly resubmitting a
+    // solved puzzle can't spam pool generation. Runs after the response is
+    // sent so it can't add latency; ensurePoolStocked never throws.
+    if (isCorrect && !insertError) {
       const { difficulty } = puzzle;
       const userId = user.id;
       after(() => ensurePoolStocked(difficulty, userId));

@@ -33,7 +33,15 @@ export async function insertPoolPuzzle(
   return data.id as string;
 }
 
-const REFILL_BATCH_SIZE = 10;
+// 5-move generation can take several seconds per attempt under the correct
+// (stricter) cook-detection in lib/shogi/generator.ts, and this whole batch
+// runs unattended in the background (see ensurePoolStocked's doc comment) —
+// keep the batch small enough that even a run of bad luck stays well within
+// a serverless function's execution budget. Level 5 gets a smaller batch
+// since each attempt there is the most expensive by a wide margin.
+function refillBatchSize(difficulty: Level): number {
+  return difficulty === 5 ? 3 : 5;
+}
 
 /**
  * If `userId` has correctly solved every currently-available valid puzzle at
@@ -46,29 +54,35 @@ const REFILL_BATCH_SIZE = 10;
 export async function ensurePoolStocked(difficulty: number, userId: string): Promise<void> {
   if (!isLevel(difficulty)) return;
 
-  const admin = createServiceRoleClient();
+  try {
+    const admin = createServiceRoleClient();
 
-  const { count: totalCount } = await admin
-    .from("puzzles")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "valid")
-    .eq("difficulty", difficulty);
+    const { count: totalCount } = await admin
+      .from("puzzles")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "valid")
+      .eq("difficulty", difficulty);
 
-  if (!totalCount) return;
+    if (!totalCount) return;
 
-  const { data: solvedRows } = await admin
-    .from("puzzle_attempts")
-    .select("puzzle_id, puzzles!inner(difficulty)")
-    .eq("user_id", userId)
-    .eq("is_correct", true)
-    .eq("puzzles.difficulty", difficulty);
+    const { data: solvedRows } = await admin
+      .from("puzzle_attempts")
+      .select("puzzle_id, puzzles!inner(difficulty)")
+      .eq("user_id", userId)
+      .eq("is_correct", true)
+      .eq("puzzles.difficulty", difficulty);
 
-  const solvedCount = new Set((solvedRows ?? []).map((row) => row.puzzle_id as string)).size;
-  if (solvedCount < totalCount) return;
+    const solvedCount = new Set((solvedRows ?? []).map((row) => row.puzzle_id as string)).size;
+    if (solvedCount < totalCount) return;
 
-  for (let i = 0; i < REFILL_BATCH_SIZE; i++) {
-    const generated = generatePuzzleForLevel(difficulty);
-    if (!generated) continue;
-    await insertPoolPuzzle(admin, generated);
+    for (let i = 0; i < refillBatchSize(difficulty); i++) {
+      const generated = generatePuzzleForLevel(difficulty);
+      if (!generated) continue;
+      await insertPoolPuzzle(admin, generated);
+    }
+  } catch {
+    // Best-effort background job — Supabase misconfiguration or a transient
+    // network error here must never propagate (this runs unattended inside
+    // next/server's after(), after the response has already been sent).
   }
 }

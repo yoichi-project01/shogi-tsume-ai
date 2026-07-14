@@ -27,7 +27,7 @@ export function createSession(puzzle: Puzzle): PuzzleSessionState {
 
 export type SubmitResult =
   | { outcome: "illegal" }
-  | { outcome: "incorrect"; session: PuzzleSessionState }
+  | { outcome: "incorrect"; session: PuzzleSessionState; isFinalAttempt: boolean }
   | { outcome: "progress"; session: PuzzleSessionState }
   | { outcome: "solved"; session: PuzzleSessionState };
 
@@ -59,6 +59,7 @@ export function submitMove(
     return {
       outcome: "incorrect",
       session: { ...session, wrongAttempts: session.wrongAttempts + 1 },
+      isFinalAttempt: isFinalAttackerMove,
     };
   }
 

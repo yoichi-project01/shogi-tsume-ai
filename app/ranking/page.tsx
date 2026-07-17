@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdBanner from "@/components/AdBanner";
 import type { RankingEntry } from "@/types/ranking";
 
@@ -12,15 +12,35 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-// Placeholder data shown until the `rankings` table is populated via Supabase.
-const SAMPLE_RANKING: RankingEntry[] = [
-  { rank: 1, userId: "1", username: "しょうぎ太郎", score: 980, correctCount: 12, accuracy: 100, answerTime: 8.2, hintsUsed: 0, currentStreak: 12 },
-  { rank: 2, userId: "2", username: "つめキング", score: 860, correctCount: 11, accuracy: 92, answerTime: 11.5, hintsUsed: 1, currentStreak: 7 },
-  { rank: 3, userId: "3", username: "初心者A", score: 540, correctCount: 8, accuracy: 80, answerTime: 20.1, hintsUsed: 3, currentStreak: 2 },
-];
+interface RankingResponse {
+  entries: RankingEntry[];
+  myRank: number | null;
+  note?: string;
+}
 
 export default function RankingPage() {
   const [tab, setTab] = useState<TabKey>("daily");
+  const [data, setData] = useState<RankingResponse | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch(`/api/ranking?type=${tab}`)
+      .then((res) => res.json())
+      .then((json: RankingResponse) => {
+        if (!cancelled) setData(json);
+      })
+      .catch(() => {
+        if (!cancelled) setData({ entries: [], myRank: null, note: "ranking data not available yet" });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
+
+  const loading = data === null;
+  const entries = data?.entries ?? [];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -55,23 +75,40 @@ export default function RankingPage() {
             </tr>
           </thead>
           <tbody>
-            {SAMPLE_RANKING.map((entry) => (
+            {entries.map((entry) => (
               <tr key={entry.userId} className="border-t border-neutral-100">
                 <td className="px-3 py-2 font-bold">{entry.rank}</td>
                 <td className="px-3 py-2">{entry.username}</td>
                 <td className="px-3 py-2 font-bold text-amber-700">{entry.score}</td>
                 <td className="px-3 py-2">{entry.correctCount}</td>
                 <td className="px-3 py-2">{entry.accuracy}%</td>
-                <td className="px-3 py-2">{entry.answerTime}秒</td>
+                <td className="px-3 py-2">{entry.answerTime != null ? `${entry.answerTime}秒` : "-"}</td>
                 <td className="px-3 py-2">{entry.hintsUsed}回</td>
               </tr>
             ))}
+            {!loading && entries.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
+                  まだこの期間の解答記録がありません。
+                </td>
+              </tr>
+            )}
+            {loading && (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
+                  読み込み中…
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-neutral-400">
-        ※ 現在はサンプルデータを表示しています。Supabase接続後、実際の解答記録に基づくランキングに切り替わります。
-      </p>
+
+      {data?.myRank != null && (
+        <p className="mt-2 text-sm text-neutral-600">
+          あなたの順位: <span className="font-bold text-amber-700">{data.myRank}位</span>
+        </p>
+      )}
 
       <AdBanner slot="ranking-bottom" className="mt-8" />
     </div>

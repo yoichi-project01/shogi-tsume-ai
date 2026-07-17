@@ -255,8 +255,13 @@ function describeSolution(solution: Move[]): string {
 
 export type GeneratedPuzzle = Omit<Puzzle, "id">;
 
-/** 1-move mate: a support piece defends the square a gold is dropped on next to the king. */
-function buildOneMovePuzzle(): GeneratedPuzzle | null {
+/** 1-move mate: a support piece defends the square a gold is dropped on next to the king.
+ * Constructively derived (not a random search) so it's cheap and solver-verified for every
+ * valid king column, making it a reliable last-resort fallback — see generateDailyPuzzle and
+ * generatePuzzleForLevel, which lean on that guarantee. buildOneMoveVariedPuzzle below is the
+ * primary source of 1-move puzzles; this stays purely as the fallback so its narrow "頭金"
+ * shape doesn't dominate the pool the way it used to. */
+function buildOneMoveGoldDropPuzzle(): GeneratedPuzzle | null {
   for (let attempt = 0; attempt < 50; attempt++) {
     const kingCol = randomInt(9);
     const sides = [-1, 1].filter((s) => kingCol + s >= 0 && kingCol + s <= 8);
@@ -288,32 +293,37 @@ function buildOneMovePuzzle(): GeneratedPuzzle | null {
 }
 
 const NEAR_CORNER_COLS = [0, 1, 7, 8];
+const ALL_COLS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
 /**
  * Scatters a small set of sente pieces (some on the board near the king,
- * the rest in hand) around a near-corner gote king. Piece counts are capped
- * to what exists in a real shogi set (see PIECE_LIMITS) so generated boards
- * stay realistic; hand-drawn types can repeat since a fresh pool is shuffled
- * per attempt.
+ * the rest in hand) around a gote king. Piece counts are capped to what
+ * exists in a real shogi set (see PIECE_LIMITS) so generated boards stay
+ * realistic; hand-drawn types can repeat since a fresh pool is shuffled per
+ * attempt. The king is biased toward corners/edges and the back rank (fewer
+ * escape squares means a higher forced-mate yield within a bounded search),
+ * but sometimes lands elsewhere so the pool isn't 100% back-rank corner
+ * mates — see git history for the duplicate-shape audit that motivated this.
  */
 function randomCandidateState(pieceCountRange: [number, number], boardCountRange: [number, number]): GameState {
-  const kingCol = pick(NEAR_CORNER_COLS);
+  const kingCol = Math.random() < 0.6 ? pick(NEAR_CORNER_COLS) : pick(ALL_COLS);
+  const kingRow = Math.random() < 0.75 ? 0 : 1;
   const board = emptyBoard();
-  board[0][kingCol] = { type: "OU", owner: "gote" };
+  board[kingRow][kingCol] = { type: "OU", owner: "gote" };
 
   const pool = shuffled(piecePool());
   const pieceCount = pieceCountRange[0] + randomInt(pieceCountRange[1] - pieceCountRange[0] + 1);
   const boardCount = boardCountRange[0] + randomInt(boardCountRange[1] - boardCountRange[0] + 1);
 
   const hand: Hand = {};
-  const used = new Set<string>([`0,${kingCol}`]);
+  const used = new Set<string>([`${kingRow},${kingCol}`]);
   let placedOnBoard = 0;
 
   for (const type of pool.slice(0, pieceCount)) {
     let placed = false;
     if (placedOnBoard < boardCount) {
       for (let t = 0; t < 20; t++) {
-        const row = 1 + randomInt(3);
+        const row = Math.min(8, kingRow + 1 + randomInt(3));
         const col = Math.max(0, Math.min(8, kingCol + randomInt(5) - 2));
         const key = `${row},${col}`;
         if (used.has(key)) continue;
@@ -340,7 +350,7 @@ function randomCandidateState(pieceCountRange: [number, number], boardCountRange
  * here is independently verified rather than trusted by construction.
  */
 function buildRandomPuzzle(
-  moveCount: 3 | 5,
+  moveCount: 1 | 3 | 5,
   attempts: number,
   pieceCountRange: [number, number],
   boardCountRange: [number, number],
@@ -365,6 +375,12 @@ function buildRandomPuzzle(
   return null;
 }
 
+/** 1-move mate via the same random-search-plus-solver approach as the 3/5-move tiers,
+ * so the 1-move pool isn't dominated by buildOneMoveGoldDropPuzzle's single "頭金" shape. */
+function buildOneMoveVariedPuzzle(): GeneratedPuzzle | null {
+  return buildRandomPuzzle(1, 300, [1, 2], [0, 2]);
+}
+
 function buildThreeMovePuzzle(): GeneratedPuzzle | null {
   return buildRandomPuzzle(3, 400, [2, 3], [1, 2]);
 }
@@ -385,27 +401,38 @@ function buildFiveMovePuzzle(): GeneratedPuzzle | null {
  * Generates one fresh, engine-verified tsume-shogi puzzle. Picks a move-count
  * tier at random (weighted toward shorter, more reliable tiers) and falls
  * back through the easier tiers if the harder ones fail to find a valid
- * position within their search budget — buildOneMovePuzzle is constructively
- * derived and solver-verified for every valid king column, so it should
- * always succeed as a last resort.
+ * position within their search budget — buildOneMoveGoldDropPuzzle is
+ * constructively derived and solver-verified for every valid king column, so
+ * it anchors the end of the fallback chain and should always succeed as a
+ * last resort.
  */
 export function generateDailyPuzzle(): GeneratedPuzzle {
   const roll = Math.random();
-  const primary = roll < 0.4 ? buildOneMovePuzzle : roll < 0.8 ? buildThreeMovePuzzle : buildFiveMovePuzzle;
+  const primary =
+    roll < 0.2
+      ? buildOneMoveGoldDropPuzzle
+      : roll < 0.4
+        ? buildOneMoveVariedPuzzle
+        : roll < 0.8
+          ? buildThreeMovePuzzle
+          : buildFiveMovePuzzle;
 
-  const result = primary() ?? buildThreeMovePuzzle() ?? buildOneMovePuzzle();
+  const result =
+    primary() ?? buildOneMoveVariedPuzzle() ?? buildThreeMovePuzzle() ?? buildOneMoveGoldDropPuzzle();
   if (!result) throw new Error("failed to generate a daily puzzle");
   return result;
 }
 
 /**
  * Generates one puzzle at a specific difficulty tier (unlike
- * generateDailyPuzzle, this never silently substitutes an easier tier —
+ * generateDailyPuzzle, this never silently substitutes a different tier —
  * callers that need a particular level should retry on null rather than
- * receive a mislabeled result).
+ * receive a mislabeled result). Level 1 tries the varied random-search
+ * builder first and only falls back to the guaranteed gold-drop template if
+ * that search comes up empty, so the pool stays diverse in the common case.
  */
 export function generatePuzzleForLevel(level: 1 | 3 | 5): GeneratedPuzzle | null {
-  if (level === 1) return buildOneMovePuzzle();
+  if (level === 1) return buildOneMoveVariedPuzzle() ?? buildOneMoveGoldDropPuzzle();
   if (level === 3) return buildThreeMovePuzzle();
   return buildFiveMovePuzzle();
 }

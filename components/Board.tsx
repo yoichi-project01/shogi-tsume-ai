@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import type { BoardMove, GameState, Move, Position } from "@/lib/shogi/types";
 import { PIECE_KANJI, generateLegalMoves } from "@/lib/shogi/rules";
 import { FILE_LABELS } from "@/lib/shogi/hints";
+import { PIECE_INFO } from "@/lib/shogi/pieceInfo";
 import Piece from "./Piece";
+import PieceMoveDiagram from "./PieceMoveDiagram";
 
 type HandPieceKey = "FU" | "KY" | "KE" | "GI" | "KI" | "KA" | "HI";
 
@@ -34,6 +36,13 @@ export default function Board({ state, onMove, disabled = false }: BoardProps) {
   }, [selection, legalMoves]);
 
   const destinationSet = new Set(legalDestinations.map((m) => `${m.to.row},${m.to.col}`));
+
+  const selectedPieceInfo =
+    selection?.kind === "board"
+      ? PIECE_INFO[state.board[selection.pos.row][selection.pos.col]!.type]
+      : selection?.kind === "hand"
+        ? PIECE_INFO[selection.piece]
+        : null;
 
   function selectBoardPiece(pos: Position) {
     const piece = state.board[pos.row][pos.col];
@@ -153,6 +162,18 @@ export default function Board({ state, onMove, disabled = false }: BoardProps) {
         selectedPiece={selection?.kind === "hand" ? selection.piece : null}
         onSelect={selectHandPiece}
       />
+
+      {selectedPieceInfo && (
+        <div className="flex w-full max-w-sm items-center gap-3 rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <PieceMoveDiagram type={selectedPieceInfo.type} size="sm" />
+          <p>
+            <span className="font-bold">
+              {selectedPieceInfo.kanji}（{selectedPieceInfo.name}）
+            </span>
+            は緑色のマスに動けます。{selectedPieceInfo.description}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

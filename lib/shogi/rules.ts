@@ -97,12 +97,13 @@ export function findKing(board: Board, color: Color): Position | null {
   return null;
 }
 
-interface MoveDef {
+export interface MoveDef {
   offsets: [number, number][];
   sliding: [number, number][];
 }
 
-function moveDef(type: PieceType, color: Color): MoveDef {
+/** The raw shape of a piece's movement (ignores board state / captures). Exposed for the piece-guide UI. */
+export function pieceMoveShape(type: PieceType, color: Color): MoveDef {
   const f = color === "sente" ? -1 : 1;
   switch (type) {
     case "FU":
@@ -141,7 +142,7 @@ function moveDef(type: PieceType, color: Color): MoveDef {
 export function pieceDestinations(board: Board, pos: Position): Position[] {
   const piece = board[pos.row][pos.col];
   if (!piece) return [];
-  const { offsets, sliding } = moveDef(piece.type, piece.owner);
+  const { offsets, sliding } = pieceMoveShape(piece.type, piece.owner);
   const dests: Position[] = [];
 
   for (const [dr, dc] of offsets) {

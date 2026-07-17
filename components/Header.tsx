@@ -3,6 +3,7 @@ import { isLoggedIn } from "@/lib/supabase/server";
 import LogoutButton from "./LogoutButton";
 
 const NAV_LINKS = [
+  { href: "/how-to-play", label: "駒の動かし方" },
   { href: "/play", label: "詰将棋を解く" },
   { href: "/daily", label: "デイリーチャレンジ" },
   { href: "/puzzles", label: "問題集" },

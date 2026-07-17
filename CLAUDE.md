@@ -36,6 +36,16 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   バックする。本番Supabaseへの実保存を`npm run seed:puzzles`（`scripts/backfill-puzzles.ts`、過去日付ぶんを
   まとめてバックフィル）で実地確認済み。5手詰は正しいチェックだと生成の成功率が下がるため（試行回数800→1200等
   で調整）、`/api/daily`は生成失敗時に3手詰・1手詰へ自動でフォールバックする設計。
+- **1手詰の生成パターン多様化**: 旧`buildOneMovePuzzle`（現`buildOneMoveGoldDropPuzzle`、確実に成功する
+  フォールバック用に温存）は「玉の隣に支え駒を1枚置き、金を打って詰ます」という単一形（頭金）しか作らず、
+  本番DBのLv1問題106件が実質6パターンの使い回しになっていた（2026-07に発覚・是正）。`buildOneMoveVariedPuzzle`
+  を追加し、3/5手詰と同じ`randomCandidateState`+`solveForced`によるランダム探索・ソルバー検証方式を1手詰にも
+  適用（`generatePuzzleForLevel(1)`/`generateDailyPuzzle`はこちらを優先し、失敗時のみ`buildOneMoveGoldDropPuzzle`
+  にフォールバック）。あわせて`randomCandidateState`の玉の初期位置を「最下段の隅寄り列」固定から列全体・
+  段0/1の混在に拡張（以前は全196件のLv1〜5問題が例外なく玉=0段目だった）。本番DBの重複問題は、デイリー
+  チャレンジ紐付き・解答履歴ありのものは残し、それ以外の同一局面（玉を基準に正規化した駒配置・持ち駒・
+  手順シグネチャが一致するもの）を`status='invalid_other'`にして一覧から除外し、Lv1は新ロジックで20件追加
+  生成した（Lv1: 106→51件・6→26パターン、Lv3: 56→46件で重複ゼロ、Lv5: 34→30件）。
 - **中間手を間違えたときの表示**: `submitMove`が返す`isFinalAttempt`フラグにより、最終手（詰みを狙う手）以外
   を間違えても「不正解です」は表示せず、黙って同じ局面で再挑戦できる（`hooks/usePuzzleSession.ts`）。
 - **問題集**: `/puzzles`（一覧）・`/puzzles/[id]`（個別プレイ）を実装済み。`status='valid'`な`puzzles`を
@@ -48,6 +58,12 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   同レベルの問題を自動で10件補充する。
 - **解答記録**: `hooks/usePuzzleSession.ts`が問題を解く/投了するたびに`/api/attempts`へPOSTするようになった
   （以前はこのAPIがどこからも呼ばれておらず、成績が一切記録されていなかった）。
+- **ランキング**: `/ranking`ページが`/api/ranking`を実際に呼ぶよう修正済み（以前はハードコードされたサンプル
+  データを表示するだけで、APIを一切呼んでいなかった）。`schema.sql`の`rankings`テーブルはどこからも書き込まれ
+  ない設計だったため（集計バッチが存在しない）、`/api/ranking`は`rankings`テーブルを見るのをやめ、
+  `puzzle_attempts`を`createServiceRoleClient()`（RLSで各ユーザーは自分の行しか見えないため）で集計する方式に
+  変更した。daily/weekly/monthlyは`attempted_at`の期間で絞り込み、totalは全期間、streakは`profiles.current_streak`
+  降順、no_hintは`used_hints=0`の正解のみ、speedは正解の平均解答時間昇順。
 - **未実装（フェーズ6相当、要件定義書参照）**: AI解説文生成の自動化（現状は`describeSolution`によるテンプレ
   文言）、称号/バッジ、月間ランキング、管理者画面。
 

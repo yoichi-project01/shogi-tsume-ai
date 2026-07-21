@@ -305,10 +305,22 @@ const ALL_COLS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
  * escape squares means a higher forced-mate yield within a bounded search),
  * but sometimes lands elsewhere so the pool isn't 100% back-rank corner
  * mates — see git history for the duplicate-shape audit that motivated this.
+ * `allowThirdRank` additionally lets the king start on row 2 for a slice of
+ * candidates, specifically so a checking piece can land *behind* it (尻/背
+ * in deriveMateTitle's vocabulary) — impossible when the king never leaves
+ * the back two ranks. Only buildOneMoveVariedPuzzle opts into this: the
+ * 3/5-move tiers' search budgets were tuned against the narrower row
+ * distribution, and a more open king position lowers their forced-mate yield
+ * within a bounded number of attempts.
  */
-function randomCandidateState(pieceCountRange: [number, number], boardCountRange: [number, number]): GameState {
+function randomCandidateState(
+  pieceCountRange: [number, number],
+  boardCountRange: [number, number],
+  allowThirdRank = false,
+): GameState {
   const kingCol = Math.random() < 0.6 ? pick(NEAR_CORNER_COLS) : pick(ALL_COLS);
-  const kingRow = Math.random() < 0.75 ? 0 : 1;
+  const rowRoll = Math.random();
+  const kingRow = allowThirdRank ? (rowRoll < 0.6 ? 0 : rowRoll < 0.9 ? 1 : 2) : rowRoll < 0.75 ? 0 : 1;
   const board = emptyBoard();
   board[kingRow][kingCol] = { type: "OU", owner: "gote" };
 
@@ -377,37 +389,49 @@ function buildRandomPuzzle(
 }
 
 /**
+ * Shapes that blind random search lands on disproportionately often at the
+ * 1-move material budget — kept at these reduced rates (rather than dropped
+ * entirely, since they're legitimate classic patterns) so they don't crowd
+ * out everything else the way unthrottled 頭金 once did (~77% of the
+ * production pool — see git history for the audit that surfaced it). Keyed
+ * by the exact title deriveMateTitle produces, so this stays in sync with
+ * that vocabulary automatically.
+ */
+const OVERREPRESENTED_ONE_MOVE_SHAPES: Record<string, number> = {
+  頭金: 1 / 8,
+  脇金: 1 / 4,
+};
+
+/**
  * 1-move mate via the same random-search-plus-solver approach as the 3/5-move
- * tiers. With only 1-2 support pieces, forced-mate-in-1 positions found by
- * blind random search land on 頭金 (a gold dropped directly in front of the
- * king) roughly three times out of four — it's mechanically the easiest shape
- * to stumble into at this material count, not a deliberate preference — which
- * left the production pool ~77% 頭金 despite this function's original intent
- * (see git history for the audit that surfaced it). Every other hit is kept;
- * 頭金 hits are kept only 1 time in 8, so the tier still includes it as the
- * classic pattern it is without it crowding out everything else.
+ * tiers. Draws from a slightly richer material budget than a minimal mate-in-1
+ * needs (up to 3 pieces on the board, 3 more in hand) so that shapes needing
+ * a supporting piece to work at all — a lance or rook mating from range, a
+ * knight drop, 腹/尻/背 positions rather than just 頭/脇 — are reachable by
+ * the search in the first place; the OVERREPRESENTED_ONE_MOVE_SHAPES throttle
+ * above only rebalances among shapes that *can* occur, it can't conjure up
+ * ones the material budget makes structurally near-impossible.
  */
 function buildOneMoveVariedPuzzle(): GeneratedPuzzle | null {
   // A much larger budget than the other tiers get away with: rejecting most
-  // 頭金 hits (below) means many raw solves get thrown away before landing on
-  // an accepted candidate, and boards this sparse (1-2 pieces) are cheap
-  // enough to search that this stays fast even at this attempt count — see
-  // the diversity audit in git history for the measurement that motivated it.
-  for (let attempt = 0; attempt < 2000; attempt++) {
-    const state = randomCandidateState([1, 2], [0, 2]);
+  // overrepresented-shape hits (below) means many raw solves get thrown away
+  // before landing on an accepted candidate, and boards this sparse (up to 6
+  // pieces total) are cheap enough to search that this stays fast even at
+  // this attempt count — see the diversity audit in git history for the
+  // measurement that motivated it.
+  for (let attempt = 0; attempt < 3000; attempt++) {
+    const state = randomCandidateState([1, 3], [0, 3], true);
     if (Object.keys(state.hands.sente).length === 0) continue;
 
     const solution = solveForced(state, 1);
     if (!solution) continue;
 
-    const king = findKing(state.board, "gote");
-    const move = solution[0];
-    const isHeadGold =
-      king !== null && move.kind === "drop" && move.piece === "KI" && move.to.row - king.row === 1 && move.to.col === king.col;
-    if (isHeadGold && Math.random() > 0.125) continue;
+    const title = deriveMateTitle(state.board, solution);
+    const keepRate = OVERREPRESENTED_ONE_MOVE_SHAPES[title];
+    if (keepRate !== undefined && Math.random() > keepRate) continue;
 
     return {
-      title: deriveMateTitle(state.board, solution),
+      title,
       initialBoard: state.board,
       initialHands: state.hands,
       solution,

@@ -7,7 +7,11 @@ import type { RankingEntry } from "@/types/ranking";
 const TABS = [
   { key: "daily", label: "デイリー" },
   { key: "weekly", label: "週間" },
+  { key: "monthly", label: "月間" },
   { key: "total", label: "累計" },
+  { key: "streak", label: "連続正解" },
+  { key: "no_hint", label: "ノーヒント" },
+  { key: "speed", label: "速解き" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -62,46 +66,81 @@ export default function RankingPage() {
       </div>
 
       <div className="mt-4 overflow-x-auto rounded border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-neutral-500">
-            <tr>
-              <th className="px-3 py-2">順位</th>
-              <th className="px-3 py-2">ユーザー名</th>
-              <th className="px-3 py-2">スコア</th>
-              <th className="px-3 py-2">正答数</th>
-              <th className="px-3 py-2">正答率</th>
-              <th className="px-3 py-2">解答時間</th>
-              <th className="px-3 py-2">ヒント</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.userId} className="border-t border-neutral-100">
-                <td className="px-3 py-2 font-bold">{entry.rank}</td>
-                <td className="px-3 py-2">{entry.username}</td>
-                <td className="px-3 py-2 font-bold text-amber-700">{entry.score}</td>
-                <td className="px-3 py-2">{entry.correctCount}</td>
-                <td className="px-3 py-2">{entry.accuracy}%</td>
-                <td className="px-3 py-2">{entry.answerTime != null ? `${entry.answerTime}秒` : "-"}</td>
-                <td className="px-3 py-2">{entry.hintsUsed}回</td>
-              </tr>
-            ))}
-            {!loading && entries.length === 0 && (
+        {tab === "streak" ? (
+          <table className="w-full text-sm">
+            <thead className="bg-neutral-50 text-left text-neutral-500">
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
-                  まだこの期間の解答記録がありません。
-                </td>
+                <th className="px-3 py-2">順位</th>
+                <th className="px-3 py-2">ユーザー名</th>
+                <th className="px-3 py-2">連続正解日数</th>
               </tr>
-            )}
-            {loading && (
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.userId} className="border-t border-neutral-100">
+                  <td className="px-3 py-2 font-bold">{entry.rank}</td>
+                  <td className="px-3 py-2">{entry.username}</td>
+                  <td className="px-3 py-2 font-bold text-amber-700">{entry.currentStreak}日</td>
+                </tr>
+              ))}
+              {!loading && entries.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-3 py-8 text-center text-neutral-400">
+                    まだ連続正解記録がありません。
+                  </td>
+                </tr>
+              )}
+              {loading && (
+                <tr>
+                  <td colSpan={3} className="px-3 py-8 text-center text-neutral-400">
+                    読み込み中…
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-neutral-50 text-left text-neutral-500">
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
-                  読み込み中…
-                </td>
+                <th className="px-3 py-2">順位</th>
+                <th className="px-3 py-2">ユーザー名</th>
+                <th className="px-3 py-2">スコア</th>
+                <th className="px-3 py-2">正答数</th>
+                <th className="px-3 py-2">正答率</th>
+                <th className="px-3 py-2">解答時間</th>
+                <th className="px-3 py-2">ヒント</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.userId} className="border-t border-neutral-100">
+                  <td className="px-3 py-2 font-bold">{entry.rank}</td>
+                  <td className="px-3 py-2">{entry.username}</td>
+                  <td className="px-3 py-2 font-bold text-amber-700">{entry.score}</td>
+                  <td className="px-3 py-2">{entry.correctCount}</td>
+                  <td className="px-3 py-2">{entry.accuracy}%</td>
+                  <td className="px-3 py-2">{entry.answerTime != null ? `${entry.answerTime}秒` : "-"}</td>
+                  <td className="px-3 py-2">{entry.hintsUsed}回</td>
+                </tr>
+              ))}
+              {!loading && entries.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
+                    まだこの期間の解答記録がありません。
+                  </td>
+                </tr>
+              )}
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-neutral-400">
+                    読み込み中…
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {data?.myRank != null && (

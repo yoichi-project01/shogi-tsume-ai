@@ -1,30 +1,36 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { SAMPLE_PUZZLES } from "@/lib/shogi/puzzles";
+import { isLevel } from "@/lib/puzzlePool";
 
 /**
- * Returns the next puzzle for the current user, matched to their level.
- * Falls back to the bundled sample puzzle set if Supabase has no `valid`
- * puzzles yet (see section 12.3: availability must not depend on AI
- * generation succeeding at request time).
+ * Returns the next puzzle for the current user. If a `difficulty` query
+ * param is given (e.g. continuing from a just-solved puzzle in the
+ * archive), that level is used as-is; otherwise it falls back to the
+ * user's profile level. Falls back to the bundled sample puzzle set if
+ * Supabase has no `valid` puzzles yet (see section 12.3: availability must
+ * not depend on AI generation succeeding at request time).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const requestedLevel = Number(request.nextUrl.searchParams.get("difficulty"));
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    let difficulty = 1;
+    let difficulty = isLevel(requestedLevel) ? requestedLevel : 1;
     let solvedPuzzleIds: string[] = [];
 
     if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("level")
-        .eq("id", user.id)
-        .maybeSingle();
-      difficulty = profile?.level ?? 1;
+      if (!isLevel(requestedLevel)) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("level")
+          .eq("id", user.id)
+          .maybeSingle();
+        difficulty = profile?.level ?? 1;
+      }
 
       const { data: attempts } = await supabase
         .from("puzzle_attempts")

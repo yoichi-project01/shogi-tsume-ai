@@ -26,11 +26,12 @@ export function getHint(puzzle: Puzzle, session: PuzzleSessionState, stage: numb
       return `注目すべき駒: ${squareLabel(nextMove.from.row, nextMove.from.col)} にある駒です。`;
     }
     case 3: {
-      const pieceName = PIECE_KANJI[nextMove.kind === "drop" ? nextMove.piece : "FU"];
       if (nextMove.kind === "drop") {
-        return `初手の候補: ${pieceName}を打つ手です。`;
+        return `初手の候補: ${PIECE_KANJI[nextMove.piece]}を打つ手です。`;
       }
-      return `初手の候補: ${squareLabel(nextMove.from.row, nextMove.from.col)}の駒を動かす手です。`;
+      const piece = session.state.board[nextMove.from.row][nextMove.from.col];
+      const pieceName = piece ? PIECE_KANJI[piece.type] : "";
+      return `初手の候補: ${squareLabel(nextMove.from.row, nextMove.from.col)}の${pieceName}を動かす手です。`;
     }
     case 4:
     default: {

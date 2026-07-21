@@ -9,7 +9,8 @@
     "lint": "eslint",
     "verify:engine": "tsx scripts/verify-engine.ts",
     "seed:puzzles": "tsx --env-file=.env.local scripts/backfill-puzzles.ts",
-    "seed:levels": "tsx --env-file=.env.local scripts/generate-level-puzzles.ts"
+    "seed:levels": "tsx --env-file=.env.local scripts/generate-level-puzzles.ts",
+    "retitle:puzzles": "tsx --env-file=.env.local scripts/retitle-puzzles.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

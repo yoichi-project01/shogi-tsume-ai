@@ -1,6 +1,7 @@
 import type { BasePieceType, Color, GameState, Hand, Move, PieceType, Position, Puzzle } from "./types";
 import { applyMove, baseType, BOARD_SIZE, emptyBoard, findKing, generateLegalMoves, inBounds, isCheckmate, isInCheck, PIECE_KANJI } from "./rules";
 import { squareLabel } from "./hints";
+import { deriveMateTitle } from "./tsumekata";
 
 /** Piece types this generator draws from when composing attacker material. */
 type AttackPiece = "KI" | "GI" | "KY" | "KE" | "HI" | "KA";
@@ -280,7 +281,7 @@ function buildOneMoveGoldDropPuzzle(): GeneratedPuzzle | null {
     if (!solution) continue;
 
     return {
-      title: "1手詰（自動生成）",
+      title: deriveMateTitle(board, solution),
       initialBoard: board,
       initialHands: hands,
       solution,
@@ -363,7 +364,7 @@ function buildRandomPuzzle(
     if (!solution) continue;
 
     return {
-      title: `${moveCount}手詰（自動生成）`,
+      title: deriveMateTitle(state.board, solution),
       initialBoard: state.board,
       initialHands: state.hands,
       solution,
@@ -375,10 +376,47 @@ function buildRandomPuzzle(
   return null;
 }
 
-/** 1-move mate via the same random-search-plus-solver approach as the 3/5-move tiers,
- * so the 1-move pool isn't dominated by buildOneMoveGoldDropPuzzle's single "頭金" shape. */
+/**
+ * 1-move mate via the same random-search-plus-solver approach as the 3/5-move
+ * tiers. With only 1-2 support pieces, forced-mate-in-1 positions found by
+ * blind random search land on 頭金 (a gold dropped directly in front of the
+ * king) roughly three times out of four — it's mechanically the easiest shape
+ * to stumble into at this material count, not a deliberate preference — which
+ * left the production pool ~77% 頭金 despite this function's original intent
+ * (see git history for the audit that surfaced it). Every other hit is kept;
+ * 頭金 hits are kept only 1 time in 8, so the tier still includes it as the
+ * classic pattern it is without it crowding out everything else.
+ */
 function buildOneMoveVariedPuzzle(): GeneratedPuzzle | null {
-  return buildRandomPuzzle(1, 300, [1, 2], [0, 2]);
+  // A much larger budget than the other tiers get away with: rejecting most
+  // 頭金 hits (below) means many raw solves get thrown away before landing on
+  // an accepted candidate, and boards this sparse (1-2 pieces) are cheap
+  // enough to search that this stays fast even at this attempt count — see
+  // the diversity audit in git history for the measurement that motivated it.
+  for (let attempt = 0; attempt < 2000; attempt++) {
+    const state = randomCandidateState([1, 2], [0, 2]);
+    if (Object.keys(state.hands.sente).length === 0) continue;
+
+    const solution = solveForced(state, 1);
+    if (!solution) continue;
+
+    const king = findKing(state.board, "gote");
+    const move = solution[0];
+    const isHeadGold =
+      king !== null && move.kind === "drop" && move.piece === "KI" && move.to.row - king.row === 1 && move.to.col === king.col;
+    if (isHeadGold && Math.random() > 0.125) continue;
+
+    return {
+      title: deriveMateTitle(state.board, solution),
+      initialBoard: state.board,
+      initialHands: state.hands,
+      solution,
+      moveCount: 1,
+      difficulty: 1,
+      explanation: describeSolution(solution),
+    };
+  }
+  return null;
 }
 
 function buildThreeMovePuzzle(): GeneratedPuzzle | null {

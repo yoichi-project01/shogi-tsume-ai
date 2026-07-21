@@ -45,7 +45,14 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   段0/1の混在に拡張（以前は全196件のLv1〜5問題が例外なく玉=0段目だった）。本番DBの重複問題は、デイリー
   チャレンジ紐付き・解答履歴ありのものは残し、それ以外の同一局面（玉を基準に正規化した駒配置・持ち駒・
   手順シグネチャが一致するもの）を`status='invalid_other'`にして一覧から除外し、Lv1は新ロジックで20件追加
-  生成した（Lv1: 106→51件・6→26パターン、Lv3: 56→46件で重複ゼロ、Lv5: 34→30件）。
+  生成した（Lv1: 106→51件・6→26パターン、Lv3: 56→46件で重複ゼロ、Lv5: 34→30件）。ただし単純にランダム探索
+  するだけでも、支え駒1〜2枚という条件下では詰み1手が頭金に落ち着くケースが構造的に多く、本番プールの約77%が
+  やはり頭金に偏っていた。そのため`buildOneMoveVariedPuzzle`は頭金ヒットを7/8の確率で捨てて他の形を探し直す
+  リジェクションサンプリングを行っている（捨てる分、試行回数も300→2000に増加。玉近傍の駒数が少なく1回の探索
+  は軽いため実用上は問題なし）。あわせて`lib/shogi/tsumekata.ts`の`deriveMateTitle()`で、最終手の駒種と玉との
+  位置関係（頭・尻・腹・脇・背）から「頭金」「腹銀」のような伝統的な詰将棋の呼び名をタイトルとして自動生成する
+  ようにし、`generator.ts`内の3つの生成関数すべてで旧来の`"N手詰（自動生成）"`という無機質な固定タイトルを置き
+  換えた。
 - **中間手を間違えたときの表示**: `submitMove`が返す`isFinalAttempt`フラグにより、最終手（詰みを狙う手）以外
   を間違えても「不正解です」は表示せず、黙って同じ局面で再挑戦できる（`hooks/usePuzzleSession.ts`）。
 - **問題集**: `/puzzles`（一覧）・`/puzzles/[id]`（個別プレイ）を実装済み。`status='valid'`な`puzzles`を
@@ -58,14 +65,39 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   同レベルの問題を自動で10件補充する。
 - **解答記録**: `hooks/usePuzzleSession.ts`が問題を解く/投了するたびに`/api/attempts`へPOSTするようになった
   （以前はこのAPIがどこからも呼ばれておらず、成績が一切記録されていなかった）。
-- **ランキング**: `/ranking`ページが`/api/ranking`を実際に呼ぶよう修正済み（以前はハードコードされたサンプル
-  データを表示するだけで、APIを一切呼んでいなかった）。`schema.sql`の`rankings`テーブルはどこからも書き込まれ
-  ない設計だったため（集計バッチが存在しない）、`/api/ranking`は`rankings`テーブルを見るのをやめ、
-  `puzzle_attempts`を`createServiceRoleClient()`（RLSで各ユーザーは自分の行しか見えないため）で集計する方式に
-  変更した。daily/weekly/monthlyは`attempted_at`の期間で絞り込み、totalは全期間、streakは`profiles.current_streak`
-  降順、no_hintは`used_hints=0`の正解のみ、speedは正解の平均解答時間昇順。
+- **ランキング**: `/ranking`ページが`/api/ranking`を実際に呼ぶよう修正済み。`/api/ranking`は
+  `puzzle_attempts`を`createServiceRoleClient()`（RLSで各ユーザーは自分の行しか見えないため）で集計する方式。
+  daily/weekly/monthlyは`attempted_at`の期間で絞り込み、totalは全期間、streakは`profiles.current_streak`降順、
+  no_hintは`used_hints=0`の正解のみ、speedは正解の平均解答時間昇順。当初UIタブは daily/weekly/total の3種のみで
+  monthly/streak/no_hint/speedはAPI実装済みなのにUIから到達不能だったため、`/ranking`ページに全7タブを追加
+  （streakタブのみ他と意味が異なる列＝連続正解数を持つため、専用のテーブル表示に分岐）。集計バッチが存在せず
+  どこからも書き込まれない設計だった`rankings`テーブルは`schema.sql`から削除した（本番Supabaseに残っていても
+  実害はないが、不要なら手動でdropして良い）。
+- **お問い合わせ**: `/api/contact`は当初`console.log`するだけで実際の送信先が無く、フォームは常に「送信完了」
+  を表示するのに内容が消えていた。`contact_messages`テーブル（RLSは有効化のみ・クライアント向けポリシー無し、
+  service roleのみ読み書き）に保存する方式に修正済み。
+- **認証はユーザー名+パスワードのみ**（2026-07変更）: `/login`・`/signup`はメールアドレスを収集しない。
+  Supabase Authは内部的にemailを必須とするため、`lib/auth.ts`の`usernameToEmail()`でユーザー名から
+  `<username>@users.shogi-tsume-ai.invalid`という実在しない決定的アドレスを生成し、それをSupabaseの
+  email/passwordログインにそのまま使っている（ユーザー名の一意性はこの仕組み上、Supabase側のemail unique
+  制約でも担保される）。ユーザー名は`USERNAME_PATTERN`（半角英数字・アンダースコア・ハイフン、3〜20文字）に
+  制限（email local-partとして安全な文字種のみ許可するため）。メールを送らない前提のため
+  パスワードリセット機能・`/auth/callback`（メール確認/リセットのリダイレクト先だった）は削除済み。
+  **要対応**: Supabaseダッシュボードの `Authentication → Providers → Email` で
+  「Confirm email」をOFFにすること。ONのままだと架空アドレス宛の確認メールが永遠に届かず、
+  サインアップしたユーザーが誰もログインできなくなる。
+- **`/play`はナビゲーションから外したが未削除**: `Header.tsx`のナビ・トップページ・マイページのCTAは
+  すべて`/puzzles`に導線を一本化し、`/play`へのリンクはどこにも無い。ただし`app/play/page.tsx`自体は
+  削除しておらず、URLを直接指定すればゲストプレイとして今も動く。リンク切れではなく意図的な整理なので、
+  「参照されていないから」という理由だけで消さないこと。
+- **`/daily`が「反応しない」ように見える不具合**: `getTodayChallenge`→`createTodayChallenge`が呼ぶ
+  `generateDailyPuzzle()`はランダム探索＋詰み検証のため実測で最大6〜7秒かかることがある（その日最初のアクセス
+  時のみ）。アプリ内に`loading.tsx`/`error.tsx`が1つも存在しなかったため、その間ブラウザは前の画面のまま
+  変化がなく、クリックしても無反応に見えていた。`app/daily/loading.tsx`（スケルトン表示）と`app/error.tsx`
+  （クライアント側の未捕捉エラーからの復帰導線）を追加して是正済み。他のSupabase依存ページ（`/puzzles`,
+  `/mypage`, `/ranking`等）も同種の体感遅延が起こり得るが、`/daily`ほど重い処理はないため未対応。
 - **未実装（フェーズ6相当、要件定義書参照）**: AI解説文生成の自動化（現状は`describeSolution`によるテンプレ
-  文言）、称号/バッジ、月間ランキング、管理者画面。
+  文言）、称号/バッジ、管理者画面。
 
 ## ハマったポイント（デプロイ作業でのトラブルシュート履歴）
 
@@ -102,11 +134,12 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
 app/            画面・APIルート（Next.js App Router）
   api/            puzzles/next, attempts（サーバー側再検証）, ranking, daily, contact
   play/, daily/, puzzles/, puzzles/[id]/   PuzzleRunnerコンポーネントを利用した対局ページ
-  login/, signup/, reset-password/, auth/callback/  Supabase Auth
+  login/, signup/  ユーザー名+パスワードのみのSupabase Auth（メールなし、lib/auth.ts参照）
   mypage/, ranking/, terms/, privacy/, contact/
 components/     Board, Piece, Header, Footer, AdBanner, HintBox, ResultModal, PuzzleRunner,
                 ArchivePuzzleRunner（問題集の個別プレイ）, LogoutButton
 hooks/          usePuzzleSession（1局分の状態管理。effect内setState/Date.now()を避けたNext.js16 lint対応版）
+lib/auth.ts     ユーザー名⇔Supabase Auth用ダミーemailの変換（usernameToEmail, USERNAME_PATTERN）
 lib/shogi/      将棋ルールエンジン（types / rules / validator / hints / puzzles / generator）
 lib/score.ts    スコア計算ロジック（要件定義書11章）
 lib/dailyPuzzle.ts  日替わり問題選出（Supabase未接続時のフォールバック）

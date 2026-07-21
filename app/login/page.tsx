@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { usernameToEmail } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,11 +19,14 @@ export default function LoginPage() {
     setError(null);
 
     const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: usernameToEmail(username),
+      password,
+    });
 
     setLoading(false);
     if (signInError) {
-      setError("メールアドレスまたはパスワードが正しくありません。");
+      setError("ユーザー名またはパスワードが正しくありません。");
       return;
     }
     router.push("/mypage");
@@ -35,15 +39,15 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
         <div>
-          <label className="block text-sm font-bold text-neutral-700" htmlFor="email">
-            メールアドレス
+          <label className="block text-sm font-bold text-neutral-700" htmlFor="username">
+            ユーザー名
           </label>
           <input
-            id="email"
-            type="email"
+            id="username"
+            type="text"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
           />
         </div>
@@ -73,12 +77,9 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="mt-4 flex justify-between text-sm">
+      <div className="mt-4 text-sm">
         <Link href="/signup" className="text-amber-700 hover:underline">
           新規登録はこちら
-        </Link>
-        <Link href="/reset-password" className="text-neutral-500 hover:underline">
-          パスワードを忘れた方
         </Link>
       </div>
     </div>

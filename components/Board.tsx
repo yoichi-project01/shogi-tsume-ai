@@ -164,9 +164,11 @@ export default function Board({ state, onMove, disabled = false }: BoardProps) {
       />
 
       {selectedPieceInfo && (
-        <div className="flex w-full max-w-sm items-center gap-3 rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
-          <PieceMoveDiagram type={selectedPieceInfo.type} size="sm" />
-          <p>
+        <div className="flex w-full max-w-sm items-start gap-3 rounded border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+          <div className="shrink-0">
+            <PieceMoveDiagram type={selectedPieceInfo.type} size="sm" />
+          </div>
+          <p className="min-w-0">
             <span className="font-bold">
               {selectedPieceInfo.kanji}（{selectedPieceInfo.name}）
             </span>

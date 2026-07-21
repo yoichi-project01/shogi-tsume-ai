@@ -106,19 +106,17 @@ create table if not exists public.daily_challenges (
 );
 
 -- ---------------------------------------------------------------------------
--- rankings
+-- contact_messages
+-- (ranking data is aggregated live from puzzle_attempts by /api/ranking;
+-- there is no separate rankings table.)
 -- ---------------------------------------------------------------------------
-create table if not exists public.rankings (
+create table if not exists public.contact_messages (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.profiles (id) on delete cascade,
-  ranking_type text not null
-    check (ranking_type in ('daily', 'weekly', 'monthly', 'total', 'streak', 'no_hint', 'speed')),
-  score integer not null default 0,
-  rank_date date not null default current_date,
+  name text not null,
+  email text not null,
+  message text not null,
   created_at timestamptz not null default now()
 );
-
-create index if not exists rankings_type_date_score_idx on public.rankings (ranking_type, rank_date, score desc);
 
 -- ---------------------------------------------------------------------------
 -- badges / user_badges
@@ -146,7 +144,7 @@ alter table public.profiles enable row level security;
 alter table public.puzzles enable row level security;
 alter table public.puzzle_attempts enable row level security;
 alter table public.daily_challenges enable row level security;
-alter table public.rankings enable row level security;
+alter table public.contact_messages enable row level security;
 alter table public.badges enable row level security;
 alter table public.user_badges enable row level security;
 
@@ -187,11 +185,8 @@ create policy "daily challenges are publicly readable"
   on public.daily_challenges for select
   using (true);
 
--- rankings: publicly readable; writes happen only via server-side (service role) processes.
-drop policy if exists "rankings are publicly readable" on public.rankings;
-create policy "rankings are publicly readable"
-  on public.rankings for select
-  using (true);
+-- contact_messages: no client-facing policy — only the service-role key
+-- (server-side only) may read or write, same pattern as unchecked puzzles.
 
 -- badges: publicly readable catalog.
 drop policy if exists "badges are publicly readable" on public.badges;

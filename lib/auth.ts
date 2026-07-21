@@ -4,7 +4,7 @@
 // reused without ever sending real mail.
 const USERNAME_EMAIL_DOMAIN = "users.shogi-tsume-ai.invalid";
 
-export const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{3,20}$/;
+export const USERNAME_PATTERN = /^[a-zA-Z0-9_-]{1,20}$/;
 
 export function usernameToEmail(username: string): string {
   return `${username.trim().toLowerCase()}@${USERNAME_EMAIL_DOMAIN}`;

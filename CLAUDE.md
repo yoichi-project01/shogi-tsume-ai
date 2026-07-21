@@ -80,7 +80,7 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   Supabase Authは内部的にemailを必須とするため、`lib/auth.ts`の`usernameToEmail()`でユーザー名から
   `<username>@users.shogi-tsume-ai.invalid`という実在しない決定的アドレスを生成し、それをSupabaseの
   email/passwordログインにそのまま使っている（ユーザー名の一意性はこの仕組み上、Supabase側のemail unique
-  制約でも担保される）。ユーザー名は`USERNAME_PATTERN`（半角英数字・アンダースコア・ハイフン、3〜20文字）に
+  制約でも担保される）。ユーザー名は`USERNAME_PATTERN`（半角英数字・アンダースコア・ハイフン、1〜20文字）に
   制限（email local-partとして安全な文字種のみ許可するため）。メールを送らない前提のため
   パスワードリセット機能・`/auth/callback`（メール確認/リセットのリダイレクト先だった）は削除済み。
   **要対応**: Supabaseダッシュボードの `Authentication → Providers → Email` で

@@ -20,7 +20,7 @@ export default function SignupPage() {
 
     if (!USERNAME_PATTERN.test(username)) {
       setLoading(false);
-      setError("ユーザー名は半角英数字・アンダースコア・ハイフンで3〜20文字にしてください。");
+      setError("ユーザー名は半角英数字・アンダースコア・ハイフンで1〜20文字にしてください。");
       return;
     }
 
@@ -59,13 +59,13 @@ export default function SignupPage() {
             id="username"
             type="text"
             required
-            pattern="[a-zA-Z0-9_-]{3,20}"
-            title="半角英数字・アンダースコア・ハイフンで3〜20文字"
+            pattern="[a-zA-Z0-9_-]{1,20}"
+            title="半角英数字・アンダースコア・ハイフンで1〜20文字"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
           />
-          <p className="mt-1 text-xs text-neutral-500">半角英数字・アンダースコア・ハイフンで3〜20文字</p>
+          <p className="mt-1 text-xs text-neutral-500">半角英数字・アンダースコア・ハイフンで1〜20文字</p>
         </div>
 
         <div>

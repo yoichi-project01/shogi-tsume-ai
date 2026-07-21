@@ -46,7 +46,7 @@ export default async function MyPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <h1 className="text-xl font-bold text-neutral-900">
-        {profile?.username ?? user.email} さんのマイページ
+        {profile?.username ?? "ユーザー"} さんのマイページ
       </h1>
 
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -61,8 +61,8 @@ export default async function MyPage() {
       </div>
 
       <div className="mt-8">
-        <Link href="/play" className="rounded bg-amber-600 px-5 py-2 font-bold text-white hover:bg-amber-700">
-          詰将棋を解く
+        <Link href="/puzzles" className="rounded bg-amber-600 px-5 py-2 font-bold text-white hover:bg-amber-700">
+          問題集に挑戦する
         </Link>
       </div>
     </div>

@@ -21,10 +21,10 @@ export default async function Home() {
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           {loggedIn ? (
             <Link
-              href="/play"
+              href="/puzzles"
               className="rounded bg-amber-600 px-6 py-3 font-bold text-white hover:bg-amber-700"
             >
-              詰将棋を解く
+              問題集に挑戦する
             </Link>
           ) : (
             <>

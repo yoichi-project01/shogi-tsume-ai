@@ -2,7 +2,7 @@ import type { Puzzle } from "./types";
 import { PIECE_KANJI } from "./rules";
 import type { PuzzleSessionState } from "./validator";
 
-export const FILE_LABELS = ["九", "八", "七", "六", "五", "四", "三", "二", "一"];
+export const FILE_LABELS = ["９", "８", "７", "６", "５", "４", "３", "２", "１"];
 export const RANK_LABELS = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
 export function squareLabel(row: number, col: number): string {

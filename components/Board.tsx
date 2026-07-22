@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { BoardMove, GameState, Move, Position } from "@/lib/shogi/types";
 import { PIECE_KANJI, generateLegalMoves } from "@/lib/shogi/rules";
-import { FILE_LABELS } from "@/lib/shogi/hints";
+import { FILE_LABELS, RANK_LABELS } from "@/lib/shogi/hints";
 import { PIECE_INFO } from "@/lib/shogi/pieceInfo";
 import Piece from "./Piece";
 import PieceMoveDiagram from "./PieceMoveDiagram";
@@ -125,27 +125,37 @@ export default function Board({ state, onMove, disabled = false }: BoardProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-9 border-2 border-neutral-800 bg-amber-100">
-          {state.board.map((row, r) =>
-            row.map((sq, c) => {
-              const isDest = destinationSet.has(`${r},${c}`);
-              const isSelected = selection?.kind === "board" && selection.pos.row === r && selection.pos.col === c;
-              return (
-                <button
-                  key={`${r}-${c}`}
-                  type="button"
-                  onClick={() => handleSquareClick({ row: r, col: c })}
-                  disabled={disabled}
-                  className={`relative flex h-10 w-10 items-center justify-center border border-neutral-400 sm:h-12 sm:w-12 ${
-                    isSelected ? "bg-amber-300" : isDest ? "bg-green-200" : ""
-                  }`}
-                >
-                  {sq && <Piece piece={sq} />}
-                  {isDest && !sq && <span className="absolute h-2.5 w-2.5 rounded-full bg-green-600" />}
-                </button>
-              );
-            }),
-          )}
+        <div className="flex">
+          <div className="grid grid-cols-9 border-2 border-neutral-800 bg-amber-100">
+            {state.board.map((row, r) =>
+              row.map((sq, c) => {
+                const isDest = destinationSet.has(`${r},${c}`);
+                const isSelected = selection?.kind === "board" && selection.pos.row === r && selection.pos.col === c;
+                return (
+                  <button
+                    key={`${r}-${c}`}
+                    type="button"
+                    onClick={() => handleSquareClick({ row: r, col: c })}
+                    disabled={disabled}
+                    className={`relative flex h-10 w-10 items-center justify-center border border-neutral-400 sm:h-12 sm:w-12 ${
+                      isSelected ? "bg-amber-300" : isDest ? "bg-green-200" : ""
+                    }`}
+                  >
+                    {sq && <Piece piece={sq} />}
+                    {isDest && !sq && <span className="absolute h-2.5 w-2.5 rounded-full bg-green-600" />}
+                  </button>
+                );
+              }),
+            )}
+          </div>
+
+          <div className="grid grid-rows-9 text-center text-xs text-neutral-500">
+            {RANK_LABELS.map((label) => (
+              <div key={label} className="flex h-10 w-4 items-center justify-center sm:h-12">
+                {label}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="mt-1 grid grid-cols-9 text-center text-xs text-neutral-500">

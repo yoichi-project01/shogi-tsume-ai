@@ -1,11 +1,11 @@
 import Link from "next/link";
 import AdBanner from "@/components/AdBanner";
-import { SAMPLE_PUZZLES } from "@/lib/shogi/puzzles";
+import { getTodayChallenge } from "@/lib/dailyChallenge";
 import { isLoggedIn } from "@/lib/supabase/server";
 
 export default async function Home() {
   const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" });
-  const dailyPuzzle = SAMPLE_PUZZLES[0];
+  const { puzzle: dailyPuzzle } = await getTodayChallenge();
   const loggedIn = await isLoggedIn();
 
   return (

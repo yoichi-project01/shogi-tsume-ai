@@ -1,12 +1,16 @@
 import type { GameState, Move, Puzzle } from "./types";
 import { applyMove, cloneState, generateLegalMoves, isCheckmate, movesEqual } from "./rules";
 
+/** Wrong attempts made without advancing past the current position. Resets
+ * to 0 whenever the player advances (correct intermediate move or mate). */
+export const MAX_WRONG_ATTEMPTS_PER_SPOT = 3;
+
 export interface PuzzleSessionState {
   state: GameState;
   moveIndex: number;
   finished: boolean;
   success: boolean;
-  wrongAttempts: number;
+  wrongAttemptsAtSpot: number;
   hintsUsed: number;
 }
 
@@ -20,7 +24,7 @@ export function createSession(puzzle: Puzzle): PuzzleSessionState {
     moveIndex: 0,
     finished: false,
     success: false,
-    wrongAttempts: 0,
+    wrongAttemptsAtSpot: 0,
     hintsUsed: 0,
   };
 }
@@ -28,6 +32,7 @@ export function createSession(puzzle: Puzzle): PuzzleSessionState {
 export type SubmitResult =
   | { outcome: "illegal" }
   | { outcome: "incorrect"; session: PuzzleSessionState; isFinalAttempt: boolean }
+  | { outcome: "out"; session: PuzzleSessionState }
   | { outcome: "progress"; session: PuzzleSessionState }
   | { outcome: "solved"; session: PuzzleSessionState };
 
@@ -56,9 +61,16 @@ export function submitMove(
   const resultsInMate = isCheckmate(afterMove, "gote");
 
   if (!matchesSolution && !(isFinalAttackerMove && resultsInMate)) {
+    const wrongAttemptsAtSpot = session.wrongAttemptsAtSpot + 1;
+    if (wrongAttemptsAtSpot >= MAX_WRONG_ATTEMPTS_PER_SPOT) {
+      return {
+        outcome: "out",
+        session: { ...session, wrongAttemptsAtSpot, finished: true, success: false },
+      };
+    }
     return {
       outcome: "incorrect",
-      session: { ...session, wrongAttempts: session.wrongAttempts + 1 },
+      session: { ...session, wrongAttemptsAtSpot },
       isFinalAttempt: isFinalAttackerMove,
     };
   }
@@ -69,7 +81,7 @@ export function submitMove(
       moveIndex: session.moveIndex + 1,
       finished: true,
       success: true,
-      wrongAttempts: session.wrongAttempts,
+      wrongAttemptsAtSpot: 0,
       hintsUsed: session.hintsUsed,
     };
     return { outcome: "solved", session: solved };
@@ -84,7 +96,7 @@ export function submitMove(
     moveIndex: session.moveIndex + 2,
     finished: false,
     success: false,
-    wrongAttempts: session.wrongAttempts,
+    wrongAttemptsAtSpot: 0,
     hintsUsed: session.hintsUsed,
   };
   return { outcome: "progress", session: advanced };

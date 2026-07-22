@@ -54,12 +54,15 @@ export function usePuzzleSession(puzzle: Puzzle, options: UsePuzzleSessionOption
       return;
     }
     if (result.outcome === "incorrect") {
-      // Only surface a "wrong" verdict once the player commits to what they
-      // believe is the mating move — intermediate moves that don't match
-      // the solution are silently rejected so exploration doesn't feel
-      // like repeated failure.
-      setMessage(result.isFinalAttempt ? "不正解です。もう一度、玉方の逃げ場をふさぐ手を考えてみましょう。" : null);
+      setMessage("違います。");
       setSession(result.session);
+      return;
+    }
+    if (result.outcome === "out") {
+      setMessage("違います。同じ場所で3回間違えたため、アウトです。");
+      setSession(result.session);
+      setFinalElapsed((Date.now() - startedAt) / 1000);
+      options.onResigned?.();
       return;
     }
 

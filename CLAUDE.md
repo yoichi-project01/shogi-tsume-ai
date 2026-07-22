@@ -53,8 +53,13 @@ MVPとして実装済み。詳細な実装状況チェックリストは `README
   頭香でも24%）と、単一パターンへの偏りは解消されている。`generator.ts`内の3つの生成関数すべてで
   `deriveMateTitle()`によるタイトルを使っており、旧来の`"N手詰（自動生成）"`という無機質な固定タイトルは
   廃止済み。
-- **中間手を間違えたときの表示**: `submitMove`が返す`isFinalAttempt`フラグにより、最終手（詰みを狙う手）以外
-  を間違えても「不正解です」は表示せず、黙って同じ局面で再挑戦できる（`hooks/usePuzzleSession.ts`）。
+- **間違えた手の表示とアウト判定**（2026-07変更）: 従来は最終手（詰みを狙う手）以外を間違えても無表示で
+  黙って再挑戦できる仕様だったが、中間手・最終手を問わずどの間違いにも`hooks/usePuzzleSession.ts`が
+  「違います。」を表示するよう変更。あわせて`lib/shogi/validator.ts`の`submitMove`が同一局面
+  （`moveIndex`が進まない間＝同じ間違い箇所）での連続誤答を`wrongAttemptsAtSpot`で数え、
+  `MAX_WRONG_ATTEMPTS_PER_SPOT`（=3）に達すると`outcome: "out"`を返して`finished: true, success: false`で
+  セッションを終了する（`ResultModal`の不正解表示・`onResigned`コールバックへ合流し、連続正解記録もリセット
+  される）。正解して`moveIndex`が進むかその問題を解き終えるたびに`wrongAttemptsAtSpot`は0にリセットされる。
 - **問題集**: `/puzzles`（一覧）・`/puzzles/[id]`（個別プレイ）を実装済み。`status='valid'`な`puzzles`を
   難易度→作成日時の順で一覧表示（デイリーチャレンジ由来のものは日付も表示）、Lv.1/3/5のタブで絞り込み可能。
   ログイン中は`puzzle_attempts`（`is_correct=true`）と突き合わせて解答済みバッジを表示する。Supabase未接続/

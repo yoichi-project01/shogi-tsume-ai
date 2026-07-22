@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   if (!body.resigned) {
     for (const move of body.moves) {
       const result = submitMove(puzzle, session, move);
-      if (result.outcome === "illegal" || result.outcome === "incorrect") break;
+      if (result.outcome === "illegal" || result.outcome === "incorrect" || result.outcome === "out") break;
       session = result.session;
       if (result.outcome === "solved") {
         isCorrect = true;
